@@ -1,0 +1,171 @@
+// Fill out your copyright notice in the Description page of Project Settings.
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "GameFramework/GameMode.h"
+#include "Variant_Survival/Core/AI/EnemyBase.h"
+#include "SDTAGameMode.generated.h"
+
+/**
+ * 七日求生游戏模式类
+ */
+UCLASS()
+class SEVENDAYSTOALIVE_API ASDTAGameMode : public AGameMode
+{
+	GENERATED_BODY()
+
+public:
+	ASDTAGameMode();
+
+protected:
+	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaTime) override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+#pragma region 昼夜循环系统
+public:
+	// 游戏时间管理
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Game State")
+	float GameTime; // 游戏内时间（秒）
+	
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Game State")
+	int32 CurrentDay; // 当前天数（1-7）
+	
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Game State")
+	bool bIsNight; // 是否为夜晚阶段
+	
+	// 时间配置
+	UPROPERTY(EditDefaultsOnly, Category = "Game Config")
+	float DayDuration; // 白天持续时间（秒）
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Game Config")
+	float NightDuration; // 夜晚持续时间（秒）
+	
+	// 昼夜切换事件
+	UFUNCTION(BlueprintCallable, Category = "Game State")
+	void StartNightPhase();
+	
+	UFUNCTION(BlueprintCallable, Category = "Game State")
+	void StartDayPhase();
+	
+	// 时间更新逻辑
+	void UpdateGameTime(float DeltaTime);
+	void CheckDayNightTransition();
+#pragma endregion
+
+#pragma region 敌人生成系统
+public:
+	// 敌人生成管理
+	UPROPERTY(EditDefaultsOnly, Category = "Enemy Spawn")
+	TSubclassOf<class AEnemyBase> EnemyClass; // 敌人类型
+	
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Enemy Spawn")
+	int32 CurrentEnemyCount; // 当前场景中敌人数量
+	
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Enemy Spawn")
+	int32 MaxEnemyCount; // 最大敌人数量
+	
+	// 波次生成配置
+	UPROPERTY(EditDefaultsOnly, Category = "Enemy Spawn")
+	TArray<int32> WaveSizes; // 每天敌人生成数量
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Enemy Spawn")
+	TArray<float> WaveIntervals; // 敌人生成间隔
+	
+	// 敌人生成逻辑
+	void SpawnEnemyWave();
+	void StartEnemySpawning();
+	void StopEnemySpawning();
+	
+	// 敌人管理
+	void OnEnemyDestroyed(class AEnemyBase* DestroyedEnemy);
+	void CleanupDeadEnemies();
+#pragma endregion
+
+#pragma region 资源与升级系统
+public:
+	// 灵魂碎片管理
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Resource System")
+	int32 TotalSoulFragments; // 总收集的灵魂碎片
+	
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Resource System")
+	int32 AvailableSoulFragments; // 可用灵魂碎片（白天升级用）
+	
+	// 升级系统
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Upgrade System")
+	TArray<FName> PlayerUpgrades; // 玩家已选择的升级
+	
+	// 资源收集
+	void CollectSoulFragments(int32 Amount);
+	void DistributeSoulFragments(); // 白天开始时分配碎片
+	
+	// 升级逻辑
+	void ApplyPlayerUpgrade(const FName& UpgradeName);
+	bool CanAffordUpgrade(int32 Cost) const;
+#pragma endregion
+
+#pragma region 多人游戏系统
+public:
+	// 玩家管理
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Multiplayer")
+	TArray<class APlayerState*> ConnectedPlayers;
+	
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Multiplayer")
+	int32 MaxPlayers; // 最大玩家数量
+	
+	// 分数系统
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Multiplayer")
+	int32 TeamScore; // 团队总分
+	
+	// 合作机制
+	void OnPlayerJoined(class APlayerController* NewPlayer);
+	void OnPlayerLeft(class APlayerController* LeavingPlayer);
+	void UpdateTeamScore(int32 Points);
+	
+	// 网络同步验证（主机权威）
+	UFUNCTION(Server, Reliable)
+	void ServerCollectFragments(class APlayerState* Player, int32 Amount);
+	
+	UFUNCTION(Server, Reliable)
+	void ServerApplyUpgrade(class APlayerState* Player, const FName& UpgradeName);
+#pragma endregion
+
+#pragma region 游戏状态管理
+public:
+	// 游戏进度
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Game State")
+	bool bGameStarted; // 游戏是否开始
+	
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Game State")
+	bool bGameOver; // 游戏是否结束
+	
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Game State")
+	bool bVictory; // 是否胜利
+	
+	// 游戏流程控制
+	void StartGame();
+	void EndGame(bool bWin);
+	void CheckWinCondition();
+	void CheckLoseCondition();
+	
+	// 存档系统（预留）
+	void SaveGameProgress();
+	void LoadGameProgress();
+#pragma endregion
+
+#pragma region UI与事件系统
+public:
+	// UI更新方法
+	void UpdateGameUI();
+	void BroadcastGameState();
+#pragma endregion
+
+private:
+	// 内部计时器
+	FTimerHandle EnemySpawnTimer;
+	FTimerHandle DayNightTimer;
+	
+	// 敌人列表
+	TArray<class AEnemyBase*> ActiveEnemies;
+};
