@@ -74,4 +74,4 @@ Plugins/*/Intermediate/*
 DerivedDataCache/*
 
 # Ignore third-party asset package
-/Content/Stylized_Cemetery/
+/Content/Assets/
