@@ -5,6 +5,8 @@
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
+#include "GameFramework/PlayerState.h"
+#include "GameFramework/PlayerController.h"
 
 #pragma region 构造函数和基础方法
 ASDTAGameMode::ASDTAGameMode()
@@ -65,20 +67,20 @@ void ASDTAGameMode::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	
 	// 复制所有需要同步的属性
-	DOREPLIFETIME(ASDTAGameMode, GameTime);
-	DOREPLIFETIME(ASDTAGameMode, CurrentDay);
-	DOREPLIFETIME(ASDTAGameMode, bIsNight);
-	DOREPLIFETIME(ASDTAGameMode, CurrentEnemyCount);
-	DOREPLIFETIME(ASDTAGameMode, MaxEnemyCount);
-	DOREPLIFETIME(ASDTAGameMode, TotalSoulFragments);
-	DOREPLIFETIME(ASDTAGameMode, AvailableSoulFragments);
-	DOREPLIFETIME(ASDTAGameMode, PlayerUpgrades);
-	DOREPLIFETIME(ASDTAGameMode, ConnectedPlayers);
-	DOREPLIFETIME(ASDTAGameMode, MaxPlayers);
-	DOREPLIFETIME(ASDTAGameMode, TeamScore);
-	DOREPLIFETIME(ASDTAGameMode, bGameStarted);
-	DOREPLIFETIME(ASDTAGameMode, bGameOver);
-	DOREPLIFETIME(ASDTAGameMode, bVictory);
+	DOREPLIFETIME(ASDTAGameMode, GameTime);						// 游戏时间
+	DOREPLIFETIME(ASDTAGameMode, CurrentDay);					// 当前天数
+	DOREPLIFETIME(ASDTAGameMode, bIsNight);						// 是否夜晚
+	DOREPLIFETIME(ASDTAGameMode, CurrentEnemyCount);			// 当前敌人数量
+	DOREPLIFETIME(ASDTAGameMode, MaxEnemyCount);				// 最大敌人数量
+	DOREPLIFETIME(ASDTAGameMode, TotalSoulFragments);			// 总灵魂碎片数量
+	DOREPLIFETIME(ASDTAGameMode, AvailableSoulFragments);		// 可用灵魂碎片数量
+	DOREPLIFETIME(ASDTAGameMode, PlayerUpgrades);				// 玩家升级信息
+	DOREPLIFETIME(ASDTAGameMode, ConnectedPlayers);				// 已连接玩家列表
+	DOREPLIFETIME(ASDTAGameMode, MaxPlayers);					// 最大玩家数量
+	DOREPLIFETIME(ASDTAGameMode, TeamScore);					// 团队分数
+	DOREPLIFETIME(ASDTAGameMode, bGameStarted);					// 是否游戏已开始
+	DOREPLIFETIME(ASDTAGameMode, bGameOver);					// 是否游戏已结束
+	DOREPLIFETIME(ASDTAGameMode, bVictory);						// 是否胜利
 }
 #pragma endregion
 
