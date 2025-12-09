@@ -30,7 +30,11 @@ public class SevenDaysToAlive : ModuleRules
 			"SevenDaysToAlive/Variant_Shooter",
 			"SevenDaysToAlive/Variant_Shooter/AI",
 			"SevenDaysToAlive/Variant_Shooter/UI",
-			"SevenDaysToAlive/Variant_Shooter/Weapons"
+			"SevenDaysToAlive/Variant_Shooter/Weapons",
+			"SevenDaysToAlive/Variant_Survival",
+			"SevenDaysToAlive/Variant_Survival/Core",
+			"SevenDaysToAlive/Variant_Survival/Core/AI",
+			"SevenDaysToAlive/Variant_Survival/Core/Game"
 		});
 
 		// Uncomment if you are using Slate UI
