@@ -86,3 +86,6 @@ DerivedDataCache/*
 .vscode/snippets/
 .vscode/compileCommands_*
 .vscode/.cache/
+
+# Ignore .trae folder
+.trae/

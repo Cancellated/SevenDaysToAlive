@@ -3,11 +3,19 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/Character.h"
+#include "SevenDaysToAliveCharacter.h"
+#include "EnhancedInputComponent.h"
+#include "InputAction.h"
+#include "Delegates/DelegateCombinations.h"
+#include "Net/UnrealNetwork.h" // 添加网络相关头文件
 #include "SDTAPlayer.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHealthChanged, float, HealthPercent);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnStaminaChanged, float, StaminaPercent);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnDeath);
+
 UCLASS()
-class SEVENDAYSTOALIVE_API ASDTAPlayer : public ACharacter
+class SEVENDAYSTOALIVE_API ASDTAPlayer : public ASevenDaysToAliveCharacter
 {
 	GENERATED_BODY()
 
@@ -29,13 +37,23 @@ public:
 	// 网络复制相关
 	// 重写GetLifetimeReplicatedProps方法来设置需要复制的属性
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	
+	// 清理资源和委托
+	virtual void EndPlay(EEndPlayReason::Type EndPlayReason) override;
 
-	// 示例：需要在网络上复制的健康值
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Character Stats")
+	// 角色统计属性
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Replicated, Category = "Character Stats")
+	float MaxHealth;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Replicated, Category = "Character Stats")
+	float MaxStamina;
+
+	// 需要在网络上复制的健康值
+	UPROPERTY(Replicated, BlueprintReadWrite, Category = "Character Stats")
 	float Health;
 
-	// 示例：需要在网络上复制的能量值
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Character Stats")
+	// 需要在网络上复制的能量值
+	UPROPERTY(Replicated, BlueprintReadWrite, Category = "Character Stats")
 	float Stamina;
 
 	// RPC方法示例
@@ -44,6 +62,12 @@ public:
 	void Server_SetHealth(float NewHealth);
 	void Server_SetHealth_Implementation(float NewHealth);
 	bool Server_SetHealth_Validate(float NewHealth);
+	
+	// 服务器端执行的方法（客户端调用）
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_SetStamina(float NewStamina);
+	void Server_SetStamina_Implementation(float NewStamina);
+	bool Server_SetStamina_Validate(float NewStamina);
 
 	// 客户端执行的方法（服务器调用）
 	UFUNCTION(Client, Reliable)
@@ -58,4 +82,37 @@ public:
 	// 网络角色检查辅助方法
 	bool IsLocallyControlled() const;
 	bool IsServer() const;
+
+	// 角色状态检查方法
+	UFUNCTION(BlueprintCallable, Category = "Character")
+	bool IsAlive() const;
+
+	// 生命值相关方法
+	UFUNCTION(BlueprintCallable, Category = "Character")
+	float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
+
+	UFUNCTION(BlueprintCallable, Category = "Character")
+	void Die();
+
+	UFUNCTION(BlueprintCallable, Category = "Character")
+	void Heal(float HealAmount);
+
+	// 能量值相关方法
+	UFUNCTION(BlueprintCallable, Category = "Character")
+	void ConsumeStamina(float Amount);
+
+	
+
+	// 事件委托声明
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FOnHealthChanged OnHealthChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FOnStaminaChanged OnStaminaChanged;
+
+public:
+	// 死亡事件
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FOnDeath OnDeath;
 };
+
