@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/PlayerController.h"
+#include "SevenDaysToAlivePlayerController.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputMappingContext.h"
@@ -18,7 +18,7 @@
  * SDTA模式的玩家控制器类，负责输入管理、UI界面、角色控制和重生逻辑
  */
 UCLASS()
-class SEVENDAYSTOALIVE_API ASDTAPlayerController : public APlayerController
+class SEVENDAYSTOALIVE_API ASDTAPlayerController : public ASevenDaysToAlivePlayerController
 {
 	GENERATED_BODY()
 
@@ -58,26 +58,6 @@ protected:
 	UFUNCTION()
 	void OnPawnDeath();
 
-	/** 默认输入映射上下文 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input", meta = (AllowPrivateAccess = "true"))
-	TArray<UInputMappingContext*> DefaultMappingContexts;
-
-	/** 移动平台排除的输入映射上下文 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input", meta = (AllowPrivateAccess = "true"))
-	TArray<UInputMappingContext*> MobileExcludedMappingContexts;
-
-	/** 移动控制界面类 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input|Touch Controls", meta = (AllowPrivateAccess = "true"))
-	TSubclassOf<UUserWidget> MobileControlsWidgetClass;
-
-	/** 移动控制界面对象 */
-	UPROPERTY()
-	TObjectPtr<UUserWidget> MobileControlsWidget;
-
-	/** 是否强制使用触摸控制 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Config, Category = "Input|Touch Controls", meta = (AllowPrivateAccess = "true"))
-	bool bForceTouchControls = false;
-
 	/** 角色类 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<ASDTAPlayer> CharacterClass;
@@ -93,9 +73,6 @@ protected:
 	/** HUD界面对象 */
 	UPROPERTY(BlueprintReadOnly, Category = "UI")
 	TObjectPtr<USDTAPlayerHUD> PlayerHUD;
-
-	/** 返回是否应该使用触摸控制 */
-	bool ShouldUseTouchControls() const;
 
 public:
 	/** 获取当前控制的SDTA角色 */

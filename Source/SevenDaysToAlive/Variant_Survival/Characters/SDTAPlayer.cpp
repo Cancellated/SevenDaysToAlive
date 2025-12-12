@@ -25,7 +25,13 @@ ASDTAPlayer::ASDTAPlayer()
 	Health = MaxHealth;
 	Stamina = MaxStamina;
 
-
+	// 初始化冲刺相关属性
+	bIsDashing = false;
+	DashSpeedMultiplier = 2.0f; // 2倍移动速度
+	DashStaminaCost = 30.0f; // 冲刺消耗30点体力
+	DashDuration = 0.5f; // 冲刺持续0.5秒
+	DashCooldown = 1.0f; // 冲刺冷却1秒
+	LastDashTime = 0.0f;
 
 	// 配置角色移动
 	if (GetCharacterMovement())
@@ -64,7 +70,9 @@ void ASDTAPlayer::EndPlay(EEndPlayReason::Type EndPlayReason)
 
 	// 清理所有委托，防止访问已销毁的对象
 	OnHealthChanged.Clear();
+	OnHealthLowWarning.Clear();
 	OnStaminaChanged.Clear();
+	OnStaminaLowWarning.Clear();
 	OnDeath.Clear();
 }
 
@@ -88,17 +96,31 @@ void ASDTAPlayer::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 	DOREPLIFETIME(ASDTAPlayer, Stamina);
 	DOREPLIFETIME(ASDTAPlayer, MaxHealth);
 	DOREPLIFETIME(ASDTAPlayer, MaxStamina);
+	
+	// 冲刺相关属性的网络复制
+	DOREPLIFETIME(ASDTAPlayer, bIsDashing);
+	DOREPLIFETIME(ASDTAPlayer, LastDashTime);
 	#undef ThisClass
 }
 
 // Server_SetHealth的实现
 void ASDTAPlayer::Server_SetHealth_Implementation(float NewHealth)
 {
+	float OldHealthPercent = Health / MaxHealth;
 	Health = FMath::Clamp(NewHealth, 0.0f, MaxHealth);
+	float NewHealthPercent = Health / MaxHealth;
+	
 	// 通知所有客户端更新HUD
 	Client_UpdateHUD(Health, Stamina);
 	// 广播健康值变化事件
-	OnHealthChanged.Broadcast(Health / MaxHealth);
+	OnHealthChanged.Broadcast(NewHealthPercent);
+	
+	// 检查低血量警告
+	const float HealthLowThreshold = 0.2f; // 20%
+	if (NewHealthPercent <= HealthLowThreshold && OldHealthPercent > HealthLowThreshold)
+	{
+		OnHealthLowWarning.Broadcast();
+	}
 }
 
 bool ASDTAPlayer::Server_SetHealth_Validate(float NewHealth)
@@ -110,11 +132,22 @@ bool ASDTAPlayer::Server_SetHealth_Validate(float NewHealth)
 // Server_SetStamina的实现
 void ASDTAPlayer::Server_SetStamina_Implementation(float NewStamina)
 {
+	float OldStaminaPercent = Stamina / MaxStamina;
 	Stamina = FMath::Clamp(NewStamina, 0.0f, MaxStamina);
+	float NewStaminaPercent = Stamina / MaxStamina;
+	
 	// 通知所有客户端更新HUD
 	Client_UpdateHUD(Health, Stamina);
 	// 广播能量值变化事件
-	OnStaminaChanged.Broadcast(Stamina / MaxStamina);
+	OnStaminaChanged.Broadcast(NewStaminaPercent);
+	
+	// 检查低体力警告
+	const float StaminaLowThreshold = 0.2f; // 20%
+	if (NewStaminaPercent <= StaminaLowThreshold && OldStaminaPercent > StaminaLowThreshold)
+	{
+		OnStaminaLowWarning.Broadcast();
+	}
+
 }
 
 bool ASDTAPlayer::Server_SetStamina_Validate(float NewStamina)
@@ -235,6 +268,136 @@ void ASDTAPlayer::Multicast_PlaySound_Implementation(USoundBase* SoundToPlay)
 		// 在客户端播放声音
 		UGameplayStatics::PlaySoundAtLocation(this, SoundToPlay, GetActorLocation());
 	}
+}
+
+// 冲刺开始的服务器端实现
+void ASDTAPlayer::Server_StartDash_Implementation()
+{
+	// 检查是否可以冲刺
+	float CurrentTime = GetWorld()->GetTimeSeconds();
+	if (bIsDashing || (CurrentTime - LastDashTime) < DashCooldown || Stamina < DashStaminaCost)
+	{
+		return;
+	}
+
+	// 消耗体力
+	Server_SetStamina(Stamina - DashStaminaCost);
+
+	// 设置冲刺状态
+	bIsDashing = true;
+	LastDashTime = CurrentTime;
+
+	// 应用冲刺速度
+	if (GetCharacterMovement())
+	{
+		// 保存原始移动速度
+		float OriginalMaxWalkSpeed = GetCharacterMovement()->MaxWalkSpeed;
+		// 设置冲刺速度
+		GetCharacterMovement()->MaxWalkSpeed *= DashSpeedMultiplier;
+	}
+
+	// 设置冲刺结束定时器
+	GetWorld()->GetTimerManager().SetTimer(FDashTimerHandle, this, &ASDTAPlayer::Server_EndDash, DashDuration, false);
+}
+
+bool ASDTAPlayer::Server_StartDash_Validate()
+{
+	// 基本验证
+	return true;
+}
+
+// 冲刺结束的服务器端实现
+void ASDTAPlayer::Server_EndDash_Implementation()
+{
+	// 检查是否处于冲刺状态
+	if (!bIsDashing)
+	{
+		return;
+	}
+
+	// 重置冲刺状态
+	bIsDashing = false;
+
+	// 恢复原始移动速度
+	if (GetCharacterMovement())
+	{
+		// 恢复原始移动速度
+		GetCharacterMovement()->MaxWalkSpeed /= DashSpeedMultiplier;
+	}
+}
+
+bool ASDTAPlayer::Server_EndDash_Validate()
+{
+	// 基本验证
+	return true;
+}
+
+// 标准化输入处理方法实现
+
+/** 处理瞄准输入 */
+void ASDTAPlayer::DoAim(float Yaw, float Pitch)
+{
+	// 确保是本地控制的角色
+	if (!IsLocallyControlled()) return;
+
+	// 获取控制器
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (!PC) return;
+
+	// 应用旋转
+	PC->AddYawInput(Yaw);
+	PC->AddPitchInput(Pitch);
+}
+
+/** 处理移动输入 */
+void ASDTAPlayer::DoMove(float Right, float Forward)
+{
+	// 确保是本地控制的角色
+	if (!IsLocallyControlled()) return;
+
+	// 获取移动方向（与父类保持一致的实现）
+	AddMovementInput(GetActorRightVector(), Right);
+	AddMovementInput(GetActorForwardVector(), Forward);
+}
+
+/** 处理跳跃开始输入 */
+void ASDTAPlayer::DoJumpStart()
+{
+	// 确保是本地控制的角色
+	if (!IsLocallyControlled()) return;
+
+	// 开始跳跃
+	Jump();
+}
+
+/** 处理跳跃结束输入 */
+void ASDTAPlayer::DoJumpEnd()
+{
+	// 确保是本地控制的角色
+	if (!IsLocallyControlled()) return;
+
+	// 结束跳跃
+	StopJumping();
+}
+
+/** 处理冲刺开始输入 */
+void ASDTAPlayer::DoDashStart()
+{
+	// 确保是本地控制的角色
+	if (!IsLocallyControlled()) return;
+
+	// 请求服务器开始冲刺
+	Server_StartDash();
+}
+
+/** 处理冲刺结束输入 */
+void ASDTAPlayer::DoDashEnd()
+{
+	// 确保是本地控制的角色
+	if (!IsLocallyControlled()) return;
+
+	// 请求服务器结束冲刺
+	Server_EndDash();
 }
 
 // 网络角色检查辅助方法

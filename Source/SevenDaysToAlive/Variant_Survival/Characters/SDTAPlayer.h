@@ -8,10 +8,13 @@
 #include "InputAction.h"
 #include "Delegates/DelegateCombinations.h"
 #include "Net/UnrealNetwork.h" // 添加网络相关头文件
+#include "TimerManager.h" // 添加定时器头文件
 #include "SDTAPlayer.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHealthChanged, float, HealthPercent);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnHealthLowWarning);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnStaminaChanged, float, StaminaPercent);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnStaminaLowWarning);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnDeath);
 
 UCLASS()
@@ -27,7 +30,7 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
-public:	
+public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
@@ -56,6 +59,28 @@ public:
 	UPROPERTY(Replicated, BlueprintReadWrite, Category = "Character Stats")
 	float Stamina;
 
+	// 冲刺相关属性
+	UPROPERTY(Replicated, BlueprintReadWrite, Category = "Character Dash")
+	bool bIsDashing;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Character Dash")
+	float DashSpeedMultiplier;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Character Dash")
+	float DashStaminaCost;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Character Dash")
+	float DashDuration;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Character Dash")
+	float DashCooldown;
+
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Character Dash")
+	float LastDashTime;
+
+	// 冲刺结束定时器句柄
+	FTimerHandle FDashTimerHandle;
+
 	// RPC方法示例
 	// 服务器端执行的方法（客户端调用）
 	UFUNCTION(Server, Reliable, WithValidation)
@@ -68,6 +93,17 @@ public:
 	void Server_SetStamina(float NewStamina);
 	void Server_SetStamina_Implementation(float NewStamina);
 	bool Server_SetStamina_Validate(float NewStamina);
+
+	// 冲刺相关RPC方法
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_StartDash();
+	void Server_StartDash_Implementation();
+	bool Server_StartDash_Validate();
+
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_EndDash();
+	void Server_EndDash_Implementation();
+	bool Server_EndDash_Validate();
 
 	// 客户端执行的方法（服务器调用）
 	UFUNCTION(Client, Reliable)
@@ -101,18 +137,40 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Character")
 	void ConsumeStamina(float Amount);
 
+	// 标准化输入处理方法（通用接口，支持来自控制器或UI的输入）
+	/** 处理瞄准输入 */
+	virtual void DoAim(float Yaw, float Pitch);
+
+	/** 处理移动输入 */
+	virtual void DoMove(float Right, float Forward);
+
+	/** 处理跳跃开始输入 */
+	virtual void DoJumpStart();
+
+	/** 处理跳跃结束输入 */
+	virtual void DoJumpEnd();
+
+	/** 处理冲刺开始输入 */
+	virtual void DoDashStart();
 	
+	/** 处理冲刺结束输入 */
+	virtual void DoDashEnd();
 
 	// 事件委托声明
 	UPROPERTY(BlueprintAssignable, Category = "Events")
 	FOnHealthChanged OnHealthChanged;
 
 	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FOnHealthLowWarning OnHealthLowWarning;
+
+	UPROPERTY(BlueprintAssignable, Category = "Events")
 	FOnStaminaChanged OnStaminaChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "Events")
+	FOnStaminaLowWarning OnStaminaLowWarning;
 
 public:
 	// 死亡事件
 	UPROPERTY(BlueprintAssignable, Category = "Events")
 	FOnDeath OnDeath;
 };
-
