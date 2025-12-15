@@ -19,9 +19,25 @@ public:
     UPROPERTY(BlueprintReadWrite, Category = "SDTA HUD", Meta = (ExposeOnSpawn = true, DisplayName = "Health Percent", OnChanged="OnHealthPercentChanged"))
     float HealthPercent = 1.0f;
 
+    /** 当前健康值，用于UI文本显示 */
+    UPROPERTY(BlueprintReadWrite, Category = "SDTA HUD", Meta = (ExposeOnSpawn = true, DisplayName = "Current Health"))
+    int32 CurrentHealth = 100;
+
+    /** 最大健康值，用于UI文本显示 */
+    UPROPERTY(BlueprintReadWrite, Category = "SDTA HUD", Meta = (ExposeOnSpawn = true, DisplayName = "Max Health"))
+    int32 MaxHealth = 100;
+
     /** 能量值百分比，用于UI绑定 */
     UPROPERTY(BlueprintReadWrite, Category = "SDTA HUD", Meta = (ExposeOnSpawn = true, DisplayName = "Stamina Percent", OnChanged="OnStaminaPercentChanged"))
     float StaminaPercent = 1.0f;
+
+    /** 当前能量值，用于UI文本显示 */
+    UPROPERTY(BlueprintReadWrite, Category = "SDTA HUD", Meta = (ExposeOnSpawn = true, DisplayName = "Current Stamina"))
+    int32 CurrentStamina = 100;
+
+    /** 最大能量值，用于UI文本显示 */
+    UPROPERTY(BlueprintReadWrite, Category = "SDTA HUD", Meta = (ExposeOnSpawn = true, DisplayName = "Max Stamina"))
+    int32 MaxStamina = 100;
 
 protected:
     /** 健康值百分比变化时的回调 */

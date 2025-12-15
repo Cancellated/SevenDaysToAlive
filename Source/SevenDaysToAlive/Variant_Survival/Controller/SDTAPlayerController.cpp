@@ -53,6 +53,26 @@ void ASDTAPlayerController::BeginPlay()
 				UE_LOG(LogSevenDaysToAlive, Error, TEXT("Could not spawn mobile controls widget."));
 			}
 		}
+
+		// 初始化跟踪整数变量
+		LastHealthInt = -1;
+		LastMaxHealthInt = -1;
+		LastStaminaInt = -1;
+		LastMaxStaminaInt = -1;
+
+		// 创建DebugUI（如果指定了UI类）
+		if (DebugUIWidgetClass)
+		{
+			DebugUIWidget = CreateWidget<USDTADebugUI>(this, DebugUIWidgetClass);
+			if (DebugUIWidget)
+			{
+				DebugUIWidget->AddToPlayerScreen(1); // 放在更高层级，确保能看到
+			}
+			else
+			{
+				UE_LOG(LogSevenDaysToAlive, Warning, TEXT("Could not spawn Debug UI widget."));
+			}
+		}
 	}
 }
 
@@ -206,8 +226,29 @@ void ASDTAPlayerController::OnHealthChanged(float HealthPercent)
 	// 更新健康值UI
 	if (PlayerHUD)
 	{
-		PlayerHUD->HealthPercent = HealthPercent;
-		// BP_UpdateHealthBar会通过OnHealthPercentChanged自动调用
+		ASDTAPlayer* SDTAPlayer = GetControlledSDTAPlayer();
+		if (SDTAPlayer)
+		{
+			// 更新健康值百分比（总是更新，用于进度条）
+			PlayerHUD->HealthPercent = HealthPercent;
+
+			// 将当前值转换为整数
+			int32 CurrentHealthInt = FMath::RoundToInt(SDTAPlayer->Health);
+			int32 MaxHealthInt = FMath::RoundToInt(SDTAPlayer->MaxHealth);
+
+			// 只有当整数部分变化时才更新HUD的当前值和最大值
+			if (CurrentHealthInt != LastHealthInt || MaxHealthInt != LastMaxHealthInt)
+			{
+				PlayerHUD->CurrentHealth = CurrentHealthInt;
+				PlayerHUD->MaxHealth = MaxHealthInt;
+
+				// 更新跟踪变量
+				LastHealthInt = CurrentHealthInt;
+				LastMaxHealthInt = MaxHealthInt;
+			}
+
+			// BP_UpdateHealthBar会通过OnHealthPercentChanged自动调用
+		}
 	}
 }
 
@@ -216,8 +257,29 @@ void ASDTAPlayerController::OnStaminaChanged(float StaminaPercent)
 	// 更新能量值UI
 	if (PlayerHUD)
 	{
-		PlayerHUD->StaminaPercent = StaminaPercent;
-		// BP_UpdateStaminaBar会通过OnStaminaPercentChanged自动调用
+		ASDTAPlayer* SDTAPlayer = GetControlledSDTAPlayer();
+		if (SDTAPlayer)
+		{
+			// 更新能量值百分比（总是更新，用于进度条）
+			PlayerHUD->StaminaPercent = StaminaPercent;
+
+			// 将当前值转换为整数
+			int32 CurrentStaminaInt = FMath::RoundToInt(SDTAPlayer->Stamina);
+			int32 MaxStaminaInt = FMath::RoundToInt(SDTAPlayer->MaxStamina);
+
+			// 只有当整数部分变化时才更新HUD的当前值和最大值
+			if (CurrentStaminaInt != LastStaminaInt || MaxStaminaInt != LastMaxStaminaInt)
+			{
+				PlayerHUD->CurrentStamina = CurrentStaminaInt;
+				PlayerHUD->MaxStamina = MaxStaminaInt;
+
+				// 更新跟踪变量
+				LastStaminaInt = CurrentStaminaInt;
+				LastMaxStaminaInt = MaxStaminaInt;
+			}
+
+			// BP_UpdateStaminaBar会通过OnStaminaPercentChanged自动调用
+		}
 	}
 }
 
@@ -231,6 +293,23 @@ void ASDTAPlayerController::OnPawnDeath()
 }
 
 
+
+void ASDTAPlayerController::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	// 更新DebugUI中的速度显示
+	if (DebugUIWidget)
+	{
+		ASDTAPlayer* SDTAPlayer = GetControlledSDTAPlayer();
+		if (SDTAPlayer)
+		{
+			// 获取角色当前速度（使用Velocity的大小）
+			float CurrentSpeed = SDTAPlayer->GetVelocity().Size();
+			DebugUIWidget->UpdateSpeed(CurrentSpeed);
+		}
+	}
+}
 
 ASDTAPlayer* ASDTAPlayerController::GetControlledSDTAPlayer() const
 {

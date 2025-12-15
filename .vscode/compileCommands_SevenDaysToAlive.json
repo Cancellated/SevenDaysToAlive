@@ -440,6 +440,22 @@
 		"directory": "D:\\Epic\\Unreal Engine\\UE_5.7\\Engine\\Source"
 	},
 	{
+		"file": "D:\\Projects\\UEProject\\SevenDaysToAlive\\Source\\SevenDaysToAlive\\Variant_Survival\\UI\\SDTADebugUI.cpp",
+		"arguments": [
+			"D:\\Visual Studio\\Visual Studio\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\Projects\\UEProject\\SevenDaysToAlive\\.vscode\\compileCommands_SevenDaysToAlive\\SevenDaysToAlive.1.rsp"
+		],
+		"directory": "D:\\Epic\\Unreal Engine\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "D:\\Projects\\UEProject\\SevenDaysToAlive\\Source\\SevenDaysToAlive\\Variant_Survival\\UI\\SDTADebugUI.h",
+		"arguments": [
+			"D:\\Visual Studio\\Visual Studio\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\Projects\\UEProject\\SevenDaysToAlive\\.vscode\\compileCommands_SevenDaysToAlive\\SevenDaysToAlive.1.rsp"
+		],
+		"directory": "D:\\Epic\\Unreal Engine\\UE_5.7\\Engine\\Source"
+	},
+	{
 		"file": "D:\\Projects\\UEProject\\SevenDaysToAlive\\Source\\SevenDaysToAlive\\Variant_Survival\\UI\\SDTAPlayerHUD.cpp",
 		"arguments": [
 			"D:\\Visual Studio\\Visual Studio\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",

@@ -30,6 +30,10 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
+	/** Dash Input Action */
+	UPROPERTY(EditAnywhere, Category = "Input")
+	class UInputAction* DashAction;
+
 public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
@@ -59,6 +63,16 @@ public:
 	UPROPERTY(Replicated, BlueprintReadWrite, Category = "Character Stats")
 	float Stamina;
 
+	// 能量回复相关属性
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Character Stats")
+	float StaminaRegenerationRate;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Character Stats")
+	float StaminaRegenerationDelay;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Character Stats")
+	bool bIsStaminaRegenerating;
+
 	// 冲刺相关属性
 	UPROPERTY(Replicated, BlueprintReadWrite, Category = "Character Dash")
 	bool bIsDashing;
@@ -78,8 +92,14 @@ public:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Character Dash")
 	float LastDashTime;
 
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Character Dash")
+	float OriginalMaxWalkSpeed;
+
 	// 冲刺结束定时器句柄
 	FTimerHandle FDashTimerHandle;
+
+	// 能量回复延迟定时器句柄
+	FTimerHandle StaminaRegenDelayTimerHandle;
 
 	// RPC方法示例
 	// 服务器端执行的方法（客户端调用）
@@ -136,6 +156,14 @@ public:
 	// 能量值相关方法
 	UFUNCTION(BlueprintCallable, Category = "Character")
 	void ConsumeStamina(float Amount);
+
+	// 开始能量回复
+	UFUNCTION()
+	void StartStaminaRegeneration();
+
+	// 获取当前移动速度
+	UFUNCTION(BlueprintCallable, Category = "Character")
+	float GetCurrentSpeed() const;
 
 	// 标准化输入处理方法（通用接口，支持来自控制器或UI的输入）
 	/** 处理瞄准输入 */

@@ -9,6 +9,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "InputAction.h"
 #include "InputMappingContext.h"
+#include "SevenDaysToAlive.h"
 
 // Sets default values
 ASDTAPlayer::ASDTAPlayer()
@@ -33,6 +34,11 @@ ASDTAPlayer::ASDTAPlayer()
 	DashCooldown = 1.0f; // 冲刺冷却1秒
 	LastDashTime = 0.0f;
 
+	// 初始化能量回复相关属性
+	StaminaRegenerationRate = 5.0f; // 每秒回复5点能量
+	StaminaRegenerationDelay = 1.0f; // 消耗能量后1秒开始回复
+	bIsStaminaRegenerating = true; // 默认正在回复能量
+
 	// 配置角色移动
 	if (GetCharacterMovement())
 	{
@@ -51,6 +57,12 @@ void ASDTAPlayer::BeginPlay()
 {
 	Super::BeginPlay();
 	
+	// 初始化原始移动速度
+	if (GetCharacterMovement())
+	{
+		OriginalMaxWalkSpeed = GetCharacterMovement()->MaxWalkSpeed;
+	}
+	
 	// 广播初始健康值和能量值
 	OnHealthChanged.Broadcast(Health / MaxHealth);
 	OnStaminaChanged.Broadcast(Stamina / MaxStamina);
@@ -61,6 +73,19 @@ void ASDTAPlayer::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	// 在服务器上处理能量回复
+	if (IsServer() && IsAlive() && bIsStaminaRegenerating)
+	{
+		float OldStamina = Stamina;
+		Stamina = FMath::Clamp(Stamina + (StaminaRegenerationRate * DeltaTime), 0.0f, MaxStamina);
+
+		// 如果能量值发生变化，通知客户端并广播事件
+		if (FMath::Abs(Stamina - OldStamina) > 0.01f)
+		{
+			Client_UpdateHUD(Health, Stamina);
+			OnStaminaChanged.Broadcast(Stamina / MaxStamina);
+		}
+	}
 }
 
 // Called when the actor is removed from the world
@@ -83,24 +108,35 @@ void ASDTAPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputComponen
 
 	// 基类已经设置了增强输入组件
 	// 可以在这里添加额外的输入绑定
+	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
+	{
+		// Dashing
+		// 冲刺绑定
+		EnhancedInputComponent->BindAction(DashAction, ETriggerEvent::Started, this, &ASDTAPlayer::DoDashStart);
+
+	}
+	else
+	{
+		UE_LOG(LogSevenDaysToAlive, Error, TEXT("'%s' Failed to find an Enhanced Input Component!"), *GetNameSafe(this));
+	}
 }
 
 // 设置需要复制的属性
 void ASDTAPlayer::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
-	#define ThisClass ASDTAPlayer
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	// 使用DOREPLIFETIME宏添加需要复制的属性
-	DOREPLIFETIME(ASDTAPlayer, Health);
-	DOREPLIFETIME(ASDTAPlayer, Stamina);
+	// 注意：属性的顺序必须与生成的代码中一致，否则会导致索引不匹配错误
 	DOREPLIFETIME(ASDTAPlayer, MaxHealth);
 	DOREPLIFETIME(ASDTAPlayer, MaxStamina);
+	DOREPLIFETIME(ASDTAPlayer, Health);
+	DOREPLIFETIME(ASDTAPlayer, Stamina);
 	
 	// 冲刺相关属性的网络复制
 	DOREPLIFETIME(ASDTAPlayer, bIsDashing);
 	DOREPLIFETIME(ASDTAPlayer, LastDashTime);
-	#undef ThisClass
+	DOREPLIFETIME(ASDTAPlayer, OriginalMaxWalkSpeed);
 }
 
 // Server_SetHealth的实现
@@ -245,11 +281,25 @@ void ASDTAPlayer::ConsumeStamina(float Amount)
 	{
 		Stamina = FMath::Clamp(Stamina - Amount, 0.0f, MaxStamina);
 		
+		// 消耗能量后暂停回复，并重置延迟计时器
+		bIsStaminaRegenerating = false;
+		GetWorldTimerManager().ClearTimer(StaminaRegenDelayTimerHandle);
+		GetWorldTimerManager().SetTimer(StaminaRegenDelayTimerHandle, this, &ASDTAPlayer::StartStaminaRegeneration, StaminaRegenerationDelay, false);
+		
 		// 通知所有客户端更新HUD
 		Client_UpdateHUD(Health, Stamina);
 		
 		// 广播能量值变化事件
 		OnStaminaChanged.Broadcast(Stamina / MaxStamina);
+	}
+}
+
+// 开始能量回复
+void ASDTAPlayer::StartStaminaRegeneration()
+{
+	if (IsServer() && IsAlive())
+	{
+		bIsStaminaRegenerating = true;
 	}
 }
 
@@ -291,7 +341,7 @@ void ASDTAPlayer::Server_StartDash_Implementation()
 	if (GetCharacterMovement())
 	{
 		// 保存原始移动速度
-		float OriginalMaxWalkSpeed = GetCharacterMovement()->MaxWalkSpeed;
+		OriginalMaxWalkSpeed = GetCharacterMovement()->MaxWalkSpeed;
 		// 设置冲刺速度
 		GetCharacterMovement()->MaxWalkSpeed *= DashSpeedMultiplier;
 	}
@@ -321,8 +371,8 @@ void ASDTAPlayer::Server_EndDash_Implementation()
 	// 恢复原始移动速度
 	if (GetCharacterMovement())
 	{
-		// 恢复原始移动速度
-		GetCharacterMovement()->MaxWalkSpeed /= DashSpeedMultiplier;
+		// 使用保存的原始移动速度恢复
+		GetCharacterMovement()->MaxWalkSpeed = OriginalMaxWalkSpeed;
 	}
 }
 
@@ -352,8 +402,8 @@ void ASDTAPlayer::DoAim(float Yaw, float Pitch)
 /** 处理移动输入 */
 void ASDTAPlayer::DoMove(float Right, float Forward)
 {
-	// 确保是本地控制的角色
-	if (!IsLocallyControlled()) return;
+	// 确保控制器有效（与父类保持一致的实现）
+	if (!GetController()) return;
 
 	// 获取移动方向（与父类保持一致的实现）
 	AddMovementInput(GetActorRightVector(), Right);
@@ -409,5 +459,12 @@ bool ASDTAPlayer::IsLocallyControlled() const
 bool ASDTAPlayer::IsServer() const
 {
 	return GetLocalRole() == ROLE_Authority;
+}
+
+// 获取当前移动速度
+float ASDTAPlayer::GetCurrentSpeed() const
+{
+	// 返回当前速度向量的大小（绝对值）
+	return GetVelocity().Size();
 }
 

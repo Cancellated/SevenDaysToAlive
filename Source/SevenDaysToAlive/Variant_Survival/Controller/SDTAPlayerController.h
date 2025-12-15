@@ -11,6 +11,7 @@
 #include "GameFramework/PlayerStart.h"
 #include "Variant_Survival/Characters/SDTAPlayer.h"
 #include "Variant_Survival/UI/SDTAPlayerHUD.h"
+#include "Variant_Survival/UI/SDTADebugUI.h"
 #include "Widgets/Input/SVirtualJoystick.h"
 #include "SDTAPlayerController.generated.h"
 
@@ -32,6 +33,9 @@ protected:
 
 	/** 设置输入组件 */
 	virtual void SetupInputComponent() override;
+
+	/** 每帧调用一次 */
+	virtual void Tick(float DeltaSeconds) override;
 
 	/** 接管角色时调用 */
 	virtual void OnPossess(APawn* InPawn) override;
@@ -73,6 +77,21 @@ protected:
 	/** HUD界面对象 */
 	UPROPERTY(BlueprintReadOnly, Category = "UI")
 	TObjectPtr<USDTAPlayerHUD> PlayerHUD;
+
+	/** DebugUI界面类 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Debug", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<USDTADebugUI> DebugUIWidgetClass;
+
+	/** DebugUI界面对象 */
+	UPROPERTY(BlueprintReadOnly, Category = "Debug")
+	TObjectPtr<USDTADebugUI> DebugUIWidget;
+
+protected:
+	/** 跟踪上一次的整数值，用于减少不必要的HUD更新 */
+	int32 LastHealthInt;
+	int32 LastMaxHealthInt;
+	int32 LastStaminaInt;
+	int32 LastMaxStaminaInt;
 
 public:
 	/** 获取当前控制的SDTA角色 */
