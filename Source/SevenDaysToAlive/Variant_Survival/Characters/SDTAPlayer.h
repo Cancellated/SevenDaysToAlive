@@ -9,6 +9,7 @@
 #include "Delegates/DelegateCombinations.h"
 #include "Net/UnrealNetwork.h" // 添加网络相关头文件
 #include "TimerManager.h" // 添加定时器头文件
+#include "Variant_Survival/Weapons/SDTAWeaponHolder.h"
 #include "SDTAPlayer.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHealthChanged, float, HealthPercent);
@@ -18,7 +19,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnStaminaLowWarning);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnDeath);
 
 UCLASS()
-class SEVENDAYSTOALIVE_API ASDTAPlayer : public ASevenDaysToAliveCharacter
+class SEVENDAYSTOALIVE_API ASDTAPlayer : public ASevenDaysToAliveCharacter, public ISDTAWeaponHolder
 {
 	GENERATED_BODY()
 
@@ -201,4 +202,48 @@ public:
 	// 死亡事件
 	UPROPERTY(BlueprintAssignable, Category = "Events")
 	FOnDeath OnDeath;
+
+	// 武器相关属性
+	/** 玩家当前持有的武器 */
+	UPROPERTY(Replicated, BlueprintReadWrite, Category = "Weapons")
+	class ASDTAWeapon* CurrentWeapon;
+
+	/** 玩家拥有的所有武器的数组 */
+	UPROPERTY(Replicated, BlueprintReadWrite, Category = "Weapons")
+	TArray<class ASDTAWeapon*> Weapons;
+
+	/** 武器附着的插座名称 */
+	UPROPERTY(EditDefaultsOnly, Category = "Weapons")
+	FName WeaponAttachSocketName;
+
+	//~Begin ISDTAWeaponHolder interface
+
+	/** 将武器的网格附加到所有者 */
+	virtual void AttachWeaponMeshes(ASDTAWeapon* Weapon) override;
+
+	/** 播放武器的开火动画蒙太奇 */
+	virtual void PlayFiringMontage(UAnimMontage* Montage) override;
+
+	/** 向所有者应用武器后坐力 */
+	virtual void AddWeaponRecoil(float Recoil) override;
+
+	/** 使用当前弹药数量更新武器HUD */
+	virtual void UpdateWeaponHUD(int32 CurrentAmmo, int32 MagazineSize) override;
+
+	/** 计算并返回武器的瞄准位置 */
+	virtual FVector GetWeaponTargetLocation() override;
+
+	/** 给所有者一个此类的武器 */
+	virtual void AddWeaponClass(const TSubclassOf<ASDTAWeapon>& WeaponClass) override;
+
+	/** 激活传入的武器 */
+	virtual void OnWeaponActivated(ASDTAWeapon* Weapon) override;
+
+	/** 停用传入的武器 */
+	virtual void OnWeaponDeactivated(ASDTAWeapon* Weapon) override;
+
+	//~End ISDTAWeaponHolder interface
+
+	/** 在玩家的物品栏中查找指定类型的武器 */
+	ASDTAWeapon* FindWeaponOfType(TSubclassOf<ASDTAWeapon> WeaponClass) const;
 };

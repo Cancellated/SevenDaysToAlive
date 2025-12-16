@@ -440,6 +440,22 @@
 		"directory": "D:\\Epic\\Unreal Engine\\UE_5.7\\Engine\\Source"
 	},
 	{
+		"file": "D:\\Projects\\UEProject\\SevenDaysToAlive\\Source\\SevenDaysToAlive\\Variant_Survival\\Core\\Pool\\SDTAPoolManager.cpp",
+		"arguments": [
+			"D:\\Visual Studio\\Visual Studio\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\Projects\\UEProject\\SevenDaysToAlive\\.vscode\\compileCommands_SevenDaysToAlive\\SevenDaysToAlive.1.rsp"
+		],
+		"directory": "D:\\Epic\\Unreal Engine\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "D:\\Projects\\UEProject\\SevenDaysToAlive\\Source\\SevenDaysToAlive\\Variant_Survival\\Core\\Pool\\SDTAPoolManager.h",
+		"arguments": [
+			"D:\\Visual Studio\\Visual Studio\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\Projects\\UEProject\\SevenDaysToAlive\\.vscode\\compileCommands_SevenDaysToAlive\\SevenDaysToAlive.1.rsp"
+		],
+		"directory": "D:\\Epic\\Unreal Engine\\UE_5.7\\Engine\\Source"
+	},
+	{
 		"file": "D:\\Projects\\UEProject\\SevenDaysToAlive\\Source\\SevenDaysToAlive\\Variant_Survival\\UI\\SDTADebugUI.cpp",
 		"arguments": [
 			"D:\\Visual Studio\\Visual Studio\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
@@ -465,6 +481,54 @@
 	},
 	{
 		"file": "D:\\Projects\\UEProject\\SevenDaysToAlive\\Source\\SevenDaysToAlive\\Variant_Survival\\UI\\SDTAPlayerHUD.h",
+		"arguments": [
+			"D:\\Visual Studio\\Visual Studio\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\Projects\\UEProject\\SevenDaysToAlive\\.vscode\\compileCommands_SevenDaysToAlive\\SevenDaysToAlive.1.rsp"
+		],
+		"directory": "D:\\Epic\\Unreal Engine\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "D:\\Projects\\UEProject\\SevenDaysToAlive\\Source\\SevenDaysToAlive\\Variant_Survival\\Weapons\\SDTAProjectiles.cpp",
+		"arguments": [
+			"D:\\Visual Studio\\Visual Studio\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\Projects\\UEProject\\SevenDaysToAlive\\.vscode\\compileCommands_SevenDaysToAlive\\SevenDaysToAlive.1.rsp"
+		],
+		"directory": "D:\\Epic\\Unreal Engine\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "D:\\Projects\\UEProject\\SevenDaysToAlive\\Source\\SevenDaysToAlive\\Variant_Survival\\Weapons\\SDTAProjectiles.h",
+		"arguments": [
+			"D:\\Visual Studio\\Visual Studio\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\Projects\\UEProject\\SevenDaysToAlive\\.vscode\\compileCommands_SevenDaysToAlive\\SevenDaysToAlive.1.rsp"
+		],
+		"directory": "D:\\Epic\\Unreal Engine\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "D:\\Projects\\UEProject\\SevenDaysToAlive\\Source\\SevenDaysToAlive\\Variant_Survival\\Weapons\\SDTAWeapon.cpp",
+		"arguments": [
+			"D:\\Visual Studio\\Visual Studio\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\Projects\\UEProject\\SevenDaysToAlive\\.vscode\\compileCommands_SevenDaysToAlive\\SevenDaysToAlive.1.rsp"
+		],
+		"directory": "D:\\Epic\\Unreal Engine\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "D:\\Projects\\UEProject\\SevenDaysToAlive\\Source\\SevenDaysToAlive\\Variant_Survival\\Weapons\\SDTAWeapon.h",
+		"arguments": [
+			"D:\\Visual Studio\\Visual Studio\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\Projects\\UEProject\\SevenDaysToAlive\\.vscode\\compileCommands_SevenDaysToAlive\\SevenDaysToAlive.1.rsp"
+		],
+		"directory": "D:\\Epic\\Unreal Engine\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "D:\\Projects\\UEProject\\SevenDaysToAlive\\Source\\SevenDaysToAlive\\Variant_Survival\\Weapons\\SDTAWeaponHolder.cpp",
+		"arguments": [
+			"D:\\Visual Studio\\Visual Studio\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\Projects\\UEProject\\SevenDaysToAlive\\.vscode\\compileCommands_SevenDaysToAlive\\SevenDaysToAlive.1.rsp"
+		],
+		"directory": "D:\\Epic\\Unreal Engine\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "D:\\Projects\\UEProject\\SevenDaysToAlive\\Source\\SevenDaysToAlive\\Variant_Survival\\Weapons\\SDTAWeaponHolder.h",
 		"arguments": [
 			"D:\\Visual Studio\\Visual Studio\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
 			"@D:\\Projects\\UEProject\\SevenDaysToAlive\\.vscode\\compileCommands_SevenDaysToAlive\\SevenDaysToAlive.1.rsp"

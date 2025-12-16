@@ -2,6 +2,7 @@
 
 
 #include "Variant_Survival/Characters/SDTAPlayer.h"
+#include "Variant_Survival/Weapons/SDTAWeapon.h"
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -14,7 +15,7 @@
 // Sets default values
 ASDTAPlayer::ASDTAPlayer()
 {
- 	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
+ 	// 设置此角色每一帧调用Tick()。如果不需要，可以关闭以提高性能。
 	PrimaryActorTick.bCanEverTick = true;
 
 	// 启用角色的网络复制
@@ -466,5 +467,173 @@ float ASDTAPlayer::GetCurrentSpeed() const
 {
 	// 返回当前速度向量的大小（绝对值）
 	return GetVelocity().Size();
+}
+
+//~Begin ISDTAWeaponHolder Interface Implementation
+
+/** 附加武器网格到角色身上 */
+void ASDTAPlayer::AttachWeaponMeshes(ASDTAWeapon* Weapon)
+{
+	if (!Weapon) return;
+	
+	// 附加第一人称武器网格到角色的第一人称Mesh组件
+	USkeletalMeshComponent* FPWeaponMesh = Weapon->GetFirstPersonMesh();
+	if (FPWeaponMesh)
+	{
+		FPWeaponMesh->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, WeaponAttachSocketName);
+	}
+	
+	// 附加第三人称武器网格到角色的Mesh组件
+	USkeletalMeshComponent* TPWeaponMesh = Weapon->GetThirdPersonMesh();
+	if (TPWeaponMesh)
+	{
+		TPWeaponMesh->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, WeaponAttachSocketName);
+	}
+}
+
+/** 播放武器射击动画 */
+void ASDTAPlayer::PlayFiringMontage(UAnimMontage* Montage)
+{
+	if (!Montage) return;
+	
+	// 播放射击动画
+	GetMesh()->GetAnimInstance()->Montage_Play(Montage);
+}
+
+/** 应用武器后坐力到角色 */
+void ASDTAPlayer::AddWeaponRecoil(float Recoil)
+{
+	// 仅在本地角色上应用后坐力
+	if (!IsLocallyControlled()) return;
+	
+	// 获取控制器
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (!PC) return;
+	
+	// 应用后坐力到控制器的旋转
+	PC->AddPitchInput(-Recoil);
+}
+
+/** 更新武器HUD显示当前弹药数量 */
+void ASDTAPlayer::UpdateWeaponHUD(int32 CurrentAmmo, int32 MagazineSize)
+{
+	// 在客户端上更新HUD
+	if (IsLocallyControlled())
+	{
+		// 这里可以添加更新HUD的逻辑
+		// 例如调用UI更新函数或触发事件
+	}
+}
+
+/** 计算并返回武器的瞄准目标位置 */
+FVector ASDTAPlayer::GetWeaponTargetLocation()
+{
+	// 获取控制器
+	AController* LocalController = GetController();
+	if (!LocalController) return FVector::ZeroVector;
+	
+	// 对于玩家控制器，使用鼠标位置进行射线检测
+	APlayerController* PC = Cast<APlayerController>(LocalController);
+	if (PC)
+	{
+		FHitResult HitResult;
+		if (PC->GetHitResultUnderCursor(ECC_Visibility, false, HitResult))
+		{
+			return HitResult.Location;
+		}
+	}
+	
+	// 默认返回角色前方一定距离的位置
+	return GetActorLocation() + GetActorForwardVector() * 1000.0f;
+}
+
+/** 给玩家添加指定类型的武器 */
+void ASDTAPlayer::AddWeaponClass(const TSubclassOf<ASDTAWeapon>& WeaponClass)
+{
+	if (!WeaponClass) return;
+	
+	// 检查玩家是否已经拥有这种武器
+	if (FindWeaponOfType(WeaponClass))
+	{
+		// 已经拥有这种武器，可以选择增加弹药或替换
+		return;
+	}
+	
+	// 仅在服务器上创建武器
+	if (IsServer())
+	{
+		// 创建武器实例
+		ASDTAWeapon* NewWeapon = GetWorld()->SpawnActor<ASDTAWeapon>(WeaponClass, GetActorLocation(), GetActorRotation());
+		if (NewWeapon)
+		{
+			// 设置武器所有者
+			// 设置武器的所有者为当前玩家
+			NewWeapon->SetOwner(this);
+			
+			// 添加到武器列表
+			Weapons.Add(NewWeapon);
+			
+			// 如果是第一个武器，自动装备
+			if (Weapons.Num() == 1)
+			{
+				NewWeapon->ActivateWeapon();
+				CurrentWeapon = NewWeapon;
+			}
+		}
+	}
+}
+
+/** 激活武器 */
+void ASDTAPlayer::OnWeaponActivated(ASDTAWeapon* Weapon)
+{
+	if (!Weapon) return;
+	
+	// 仅在服务器上处理激活逻辑
+	if (IsServer())
+	{
+		// 如果有当前武器，先停用它
+		if (CurrentWeapon && CurrentWeapon != Weapon)
+		{
+			CurrentWeapon->DeactivateWeapon();
+		}
+		
+		// 设置当前武器
+		CurrentWeapon = Weapon;
+	}
+}
+
+/** 停用武器 */
+void ASDTAPlayer::OnWeaponDeactivated(ASDTAWeapon* Weapon)
+{
+	if (!Weapon) return;
+	
+	// 仅在服务器上处理停用逻辑
+	if (IsServer())
+	{
+		// 如果停用的是当前武器，清除当前武器
+		if (CurrentWeapon == Weapon)
+		{
+			CurrentWeapon = nullptr;
+		}
+	}
+}
+
+//~End ISDTAWeaponHolder Interface Implementation
+
+/** 在玩家的武器库中查找指定类型的武器 */
+ASDTAWeapon* ASDTAPlayer::FindWeaponOfType(TSubclassOf<ASDTAWeapon> WeaponClass) const
+{
+	if (!WeaponClass) return nullptr;
+	
+	// 遍历玩家的武器列表，查找指定类型的武器
+	for (ASDTAWeapon* Weapon : Weapons)
+	{
+		if (Weapon && Weapon->IsA(WeaponClass))
+		{
+			return Weapon;
+		}
+	}
+	
+	return nullptr;
 }
 
