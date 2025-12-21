@@ -392,6 +392,38 @@
 		"directory": "D:\\Epic\\Unreal Engine\\UE_5.7\\Engine\\Source"
 	},
 	{
+		"file": "D:\\Projects\\UEProject\\SevenDaysToAlive\\Source\\SevenDaysToAlive\\Variant_Survival\\Components\\HealthComponent.cpp",
+		"arguments": [
+			"D:\\Visual Studio\\Visual Studio\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\Projects\\UEProject\\SevenDaysToAlive\\.vscode\\compileCommands_SevenDaysToAlive\\SevenDaysToAlive.1.rsp"
+		],
+		"directory": "D:\\Epic\\Unreal Engine\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "D:\\Projects\\UEProject\\SevenDaysToAlive\\Source\\SevenDaysToAlive\\Variant_Survival\\Components\\HealthComponent.h",
+		"arguments": [
+			"D:\\Visual Studio\\Visual Studio\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\Projects\\UEProject\\SevenDaysToAlive\\.vscode\\compileCommands_SevenDaysToAlive\\SevenDaysToAlive.1.rsp"
+		],
+		"directory": "D:\\Epic\\Unreal Engine\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "D:\\Projects\\UEProject\\SevenDaysToAlive\\Source\\SevenDaysToAlive\\Variant_Survival\\Components\\StaminaSystemComponent.cpp",
+		"arguments": [
+			"D:\\Visual Studio\\Visual Studio\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\Projects\\UEProject\\SevenDaysToAlive\\.vscode\\compileCommands_SevenDaysToAlive\\SevenDaysToAlive.1.rsp"
+		],
+		"directory": "D:\\Epic\\Unreal Engine\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "D:\\Projects\\UEProject\\SevenDaysToAlive\\Source\\SevenDaysToAlive\\Variant_Survival\\Components\\StaminaSystemComponent.h",
+		"arguments": [
+			"D:\\Visual Studio\\Visual Studio\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\Projects\\UEProject\\SevenDaysToAlive\\.vscode\\compileCommands_SevenDaysToAlive\\SevenDaysToAlive.1.rsp"
+		],
+		"directory": "D:\\Epic\\Unreal Engine\\UE_5.7\\Engine\\Source"
+	},
+	{
 		"file": "D:\\Projects\\UEProject\\SevenDaysToAlive\\Source\\SevenDaysToAlive\\Variant_Survival\\Controller\\SDTAPlayerController.cpp",
 		"arguments": [
 			"D:\\Visual Studio\\Visual Studio\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
@@ -481,6 +513,22 @@
 	},
 	{
 		"file": "D:\\Projects\\UEProject\\SevenDaysToAlive\\Source\\SevenDaysToAlive\\Variant_Survival\\UI\\SDTAPlayerHUD.h",
+		"arguments": [
+			"D:\\Visual Studio\\Visual Studio\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\Projects\\UEProject\\SevenDaysToAlive\\.vscode\\compileCommands_SevenDaysToAlive\\SevenDaysToAlive.1.rsp"
+		],
+		"directory": "D:\\Epic\\Unreal Engine\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "D:\\Projects\\UEProject\\SevenDaysToAlive\\Source\\SevenDaysToAlive\\Variant_Survival\\Weapons\\SDTAPickup.cpp",
+		"arguments": [
+			"D:\\Visual Studio\\Visual Studio\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\Projects\\UEProject\\SevenDaysToAlive\\.vscode\\compileCommands_SevenDaysToAlive\\SevenDaysToAlive.1.rsp"
+		],
+		"directory": "D:\\Epic\\Unreal Engine\\UE_5.7\\Engine\\Source"
+	},
+	{
+		"file": "D:\\Projects\\UEProject\\SevenDaysToAlive\\Source\\SevenDaysToAlive\\Variant_Survival\\Weapons\\SDTAPickup.h",
 		"arguments": [
 			"D:\\Visual Studio\\Visual Studio\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
 			"@D:\\Projects\\UEProject\\SevenDaysToAlive\\.vscode\\compileCommands_SevenDaysToAlive\\SevenDaysToAlive.1.rsp"

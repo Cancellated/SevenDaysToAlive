@@ -41,11 +41,17 @@ public:
 	virtual FVector GetWeaponTargetLocation() = 0;
 
 	/** 给所有者一个此类的武器 */
-	virtual void AddWeaponClass(const TSubclassOf<ASDTAWeapon>& WeaponClass) = 0;
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category="Weapon")
+	void AddWeaponClass(TSubclassOf<ASDTAWeapon> WeaponClass);
+	virtual void AddWeaponClass_Implementation(TSubclassOf<ASDTAWeapon> WeaponClass) = 0;
 
 	/** 激活传入的武器 */
-	virtual void OnWeaponActivated(ASDTAWeapon* Weapon) = 0;
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category="Weapon")
+	void OnWeaponActivated(ASDTAWeapon* Weapon);
+	virtual void OnWeaponActivated_Implementation(ASDTAWeapon* Weapon) = 0;
 
 	/** 停用传入的武器 */
-	virtual void OnWeaponDeactivated(ASDTAWeapon* Weapon) = 0;
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category="Weapon")
+	void OnWeaponDeactivated(ASDTAWeapon* Weapon);
+	virtual void OnWeaponDeactivated_Implementation(ASDTAWeapon* Weapon) = 0;
 };

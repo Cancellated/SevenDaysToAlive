@@ -46,11 +46,11 @@ protected:
 	USDTAPoolManager* PoolManager;
 
 	/** 此武器发射的投射物类型 */
-	UPROPERTY(EditAnywhere, Category="Ammo")
+	UPROPERTY(EditAnywhere, Category="弹药")
 	TSubclassOf<ASDTAProjectiles> ProjectileClass;
 
 	/** 弹夹中的子弹数量 */
-	UPROPERTY(EditAnywhere, Category="Ammo", meta = (ClampMin = 0, ClampMax = 100))
+	UPROPERTY(EditAnywhere, Category="弹药", meta = (ClampMin = 0, ClampMax = 100))
 	int32 MagazineSize = 10;
 
 	/** 当前弹夹中的子弹数量 */
@@ -69,28 +69,29 @@ protected:
 	TSubclassOf<UAnimInstance> ThirdPersonAnimInstanceClass;
 
 	/** 瞄准时光束半角的偏差 */
-	UPROPERTY(EditAnywhere, Category="Aim", meta = (ClampMin = 0, ClampMax = 90, Units = "Degrees"))
+	//注意，后坐力系统还没有实现
+	UPROPERTY(EditAnywhere, Category="瞄准", meta = (ClampMin = 0, ClampMax = 90, Units = "Degrees"))
 	float AimVariance = 0.0f;
 
 	/** 应用到所有者的开火后坐力大小 */
-	UPROPERTY(EditAnywhere, Category="Aim", meta = (ClampMin = 0, ClampMax = 100))
+	UPROPERTY(EditAnywhere, Category="瞄准", meta = (ClampMin = 0, ClampMax = 100))
 	float FiringRecoil = 0.0f;
 
 	/** 第一人称枪口插座的名称，投射物将在此生成 */
-	UPROPERTY(EditAnywhere, Category="Aim")
+	UPROPERTY(EditAnywhere, Category="瞄准")
 	FName MuzzleSocketName;
 
 	/** 子弹在枪口前方生成的距离 */
-	UPROPERTY(EditAnywhere, Category="Aim", meta = (ClampMin = 0, ClampMax = 1000, Units = "cm"))
+	UPROPERTY(EditAnywhere, Category="瞄准", meta = (ClampMin = 0, ClampMax = 1000, Units = "cm"))
 	float MuzzleOffset = 10.0f;
 
 	/** 如果为true，此武器将以射速自动开火 */
-	UPROPERTY(EditAnywhere, Category="Refire")
+	UPROPERTY(EditAnywhere, Category="射击模式")
 	bool bFullAuto = false;
 
 	/** 此武器射击之间的时间间隔，影响全自动和半自动模式 */
-	UPROPERTY(EditAnywhere, Category="Refire", meta = (ClampMin = 0, ClampMax = 5, Units = "s"))
-	float RefireRate = 0.5f;
+	UPROPERTY(EditAnywhere, Category="射击模式", meta = (ClampMin = 0, ClampMax = 5, Units = "s"))
+	float RefireRate = 0.2f;
 
 	/** 最后一次射击的游戏时间，用于在半自动模式下强制射速 */
 	float TimeOfLastShot = 0.0f;
@@ -173,10 +174,10 @@ public:
 	UFUNCTION(BlueprintPure, Category="Weapon")
 	USkeletalMeshComponent* GetThirdPersonMesh() const { return ThirdPersonMesh; };
 
-	/** Returns the first person anim instance class */
+	/** 返回第一人称AnimInstance类 */
 	const TSubclassOf<UAnimInstance>& GetFirstPersonAnimInstanceClass() const;
 
-	/** Returns the third person anim instance class */
+	/** 返回第三人称AnimInstance类 */
 	const TSubclassOf<UAnimInstance>& GetThirdPersonAnimInstanceClass() const;
 
 	/** 返回弹夹大小 */
@@ -184,4 +185,8 @@ public:
 
 	/** 返回当前子弹数量 */
 	int32 GetBulletCount() const { return CurrentBullets; }
+
+	/** 重新装填武器 */
+	UFUNCTION(BlueprintCallable, Category="Weapon")
+	void Reload();
 };

@@ -279,7 +279,7 @@ void ASDTAProjectiles::OnDeferredDestruction()
 	}
 	else
 	{
-		// 销毁这个演员，释放资源
+		// 销毁这个Actor，释放资源
 		Destroy();
 	}
 }

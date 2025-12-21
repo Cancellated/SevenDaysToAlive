@@ -9,6 +9,8 @@
 #include "Delegates/DelegateCombinations.h"
 #include "Net/UnrealNetwork.h" // 添加网络相关头文件
 #include "TimerManager.h" // 添加定时器头文件
+#include "Variant_Survival/Components/HealthComponent.h"
+#include "Variant_Survival/Components/StaminaSystemComponent.h"
 #include "Variant_Survival/Weapons/SDTAWeaponHolder.h"
 #include "SDTAPlayer.generated.h"
 
@@ -35,6 +37,18 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Input")
 	class UInputAction* DashAction;
 
+	/** Fire Input Action */
+	UPROPERTY(EditAnywhere, Category = "Input")
+	class UInputAction* FireAction;
+
+	/** Reload Input Action */
+	UPROPERTY(EditAnywhere, Category = "Input")
+	class UInputAction* ReloadAction;
+
+	/** Switch Weapon Input Action */
+	UPROPERTY(EditAnywhere, Category = "Input")
+	class UInputAction* SwitchWeaponAction;
+
 public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
@@ -49,30 +63,13 @@ public:
 	// 清理资源和委托
 	virtual void EndPlay(EEndPlayReason::Type EndPlayReason) override;
 
-	// 角色统计属性
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Replicated, Category = "Character Stats")
-	float MaxHealth;
+	// 健康组件
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Character Components")
+	class UHealthComponent* HealthComponent;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Replicated, Category = "Character Stats")
-	float MaxStamina;
-
-	// 需要在网络上复制的健康值
-	UPROPERTY(Replicated, BlueprintReadWrite, Category = "Character Stats")
-	float Health;
-
-	// 需要在网络上复制的能量值
-	UPROPERTY(Replicated, BlueprintReadWrite, Category = "Character Stats")
-	float Stamina;
-
-	// 能量回复相关属性
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Character Stats")
-	float StaminaRegenerationRate;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Character Stats")
-	float StaminaRegenerationDelay;
-
-	UPROPERTY(BlueprintReadWrite, Category = "Character Stats")
-	bool bIsStaminaRegenerating;
+	// 耐力组件
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Character Components")
+	class UStaminaSystemComponent* StaminaComponent;
 
 	// 冲刺相关属性
 	UPROPERTY(Replicated, BlueprintReadWrite, Category = "Character Dash")
@@ -99,21 +96,9 @@ public:
 	// 冲刺结束定时器句柄
 	FTimerHandle FDashTimerHandle;
 
-	// 能量回复延迟定时器句柄
-	FTimerHandle StaminaRegenDelayTimerHandle;
 
-	// RPC方法示例
-	// 服务器端执行的方法（客户端调用）
-	UFUNCTION(Server, Reliable, WithValidation)
-	void Server_SetHealth(float NewHealth);
-	void Server_SetHealth_Implementation(float NewHealth);
-	bool Server_SetHealth_Validate(float NewHealth);
-	
-	// 服务器端执行的方法（客户端调用）
-	UFUNCTION(Server, Reliable, WithValidation)
-	void Server_SetStamina(float NewStamina);
-	void Server_SetStamina_Implementation(float NewStamina);
-	bool Server_SetStamina_Validate(float NewStamina);
+
+
 
 	// 冲刺相关RPC方法
 	UFUNCTION(Server, Reliable, WithValidation)
@@ -128,8 +113,8 @@ public:
 
 	// 客户端执行的方法（服务器调用）
 	UFUNCTION(Client, Reliable)
-	void Client_UpdateHUD(float NewHealth, float NewStamina);
-	void Client_UpdateHUD_Implementation(float NewHealth, float NewStamina);
+	void Client_UpdateHUD();
+	void Client_UpdateHUD_Implementation();
 
 	// 所有客户端执行的方法（服务器调用）
 	UFUNCTION(NetMulticast, Reliable)
@@ -158,9 +143,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Character")
 	void ConsumeStamina(float Amount);
 
-	// 开始能量回复
-	UFUNCTION()
-	void StartStaminaRegeneration();
+
 
 	// 获取当前移动速度
 	UFUNCTION(BlueprintCallable, Category = "Character")
@@ -185,6 +168,22 @@ public:
 	/** 处理冲刺结束输入 */
 	virtual void DoDashEnd();
 
+	/** 处理开火开始输入 */
+	virtual void DoFireStart();
+
+	/** 处理开火结束输入 */
+	virtual void DoFireEnd();
+
+	/** 处理重新装填输入 */
+	virtual void DoReload();
+
+	/** 处理武器切换输入 */
+	virtual void DoSwitchWeapon();
+
+	/** 切换到下一个武器 */
+	UFUNCTION(BlueprintCallable, Category = "Weapons")
+	void SwitchToNextWeapon();
+
 	// 事件委托声明
 	UPROPERTY(BlueprintAssignable, Category = "Events")
 	FOnHealthChanged OnHealthChanged;
@@ -202,6 +201,27 @@ public:
 	// 死亡事件
 	UPROPERTY(BlueprintAssignable, Category = "Events")
 	FOnDeath OnDeath;
+
+protected:
+	// 内部健康值变化处理方法
+	UFUNCTION()
+	void OnHealthChangedInternal(float HealthPercent);
+	
+	// 内部低健康值警告处理方法
+	UFUNCTION()
+	void OnHealthLowWarningInternal();
+	
+	// 内部死亡处理方法
+	UFUNCTION()
+	void OnDeathInternal();
+	
+	// 内部能量值变化处理方法
+	UFUNCTION()
+	void OnStaminaChangedInternal(float StaminaPercent);
+	
+	// 内部低能量值警告处理方法
+	UFUNCTION()
+	void OnStaminaLowWarningInternal();
 
 	// 武器相关属性
 	/** 玩家当前持有的武器 */
@@ -234,13 +254,13 @@ public:
 	virtual FVector GetWeaponTargetLocation() override;
 
 	/** 给所有者一个此类的武器 */
-	virtual void AddWeaponClass(const TSubclassOf<ASDTAWeapon>& WeaponClass) override;
+	virtual void AddWeaponClass_Implementation(TSubclassOf<ASDTAWeapon> WeaponClass) override;
 
 	/** 激活传入的武器 */
-	virtual void OnWeaponActivated(ASDTAWeapon* Weapon) override;
+	virtual void OnWeaponActivated_Implementation(ASDTAWeapon* Weapon) override;
 
 	/** 停用传入的武器 */
-	virtual void OnWeaponDeactivated(ASDTAWeapon* Weapon) override;
+	virtual void OnWeaponDeactivated_Implementation(ASDTAWeapon* Weapon) override;
 
 	//~End ISDTAWeaponHolder interface
 

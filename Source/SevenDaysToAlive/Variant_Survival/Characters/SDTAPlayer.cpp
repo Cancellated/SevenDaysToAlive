@@ -21,11 +21,11 @@ ASDTAPlayer::ASDTAPlayer()
 	// 启用角色的网络复制
 	bReplicates = true;
 
-	// 初始化角色统计属性
-	MaxHealth = 100.0f;
-	MaxStamina = 100.0f;
-	Health = MaxHealth;
-	Stamina = MaxStamina;
+	// 创建健康组件
+	HealthComponent = CreateDefaultSubobject<UHealthComponent>(TEXT("HealthComponent"));
+	
+	// 创建耐力组件
+	StaminaComponent = CreateDefaultSubobject<UStaminaSystemComponent>(TEXT("StaminaComponent"));
 
 	// 初始化冲刺相关属性
 	bIsDashing = false;
@@ -34,11 +34,6 @@ ASDTAPlayer::ASDTAPlayer()
 	DashDuration = 0.5f; // 冲刺持续0.5秒
 	DashCooldown = 1.0f; // 冲刺冷却1秒
 	LastDashTime = 0.0f;
-
-	// 初始化能量回复相关属性
-	StaminaRegenerationRate = 5.0f; // 每秒回复5点能量
-	StaminaRegenerationDelay = 1.0f; // 消耗能量后1秒开始回复
-	bIsStaminaRegenerating = true; // 默认正在回复能量
 
 	// 配置角色移动
 	if (GetCharacterMovement())
@@ -51,6 +46,10 @@ ASDTAPlayer::ASDTAPlayer()
 		bUseControllerRotationPitch = false;
 		bUseControllerRotationRoll = false;
 	}
+	
+	// 设置武器附着的默认插座名称
+	WeaponAttachSocketName = TEXT("WeaponSocket");
+	// 对于第一人称角色，也可以使用 "GripPoint" 或其他适合的插座名
 }
 
 // Called when the game starts or when spawned
@@ -64,42 +63,99 @@ void ASDTAPlayer::BeginPlay()
 		OriginalMaxWalkSpeed = GetCharacterMovement()->MaxWalkSpeed;
 	}
 	
-	// 广播初始健康值和能量值
-	OnHealthChanged.Broadcast(Health / MaxHealth);
-	OnStaminaChanged.Broadcast(Stamina / MaxStamina);
+	// 设置组件委托回调
+	if (HealthComponent)
+	{
+		// 绑定健康值变化委托
+		HealthComponent->OnHealthChanged.AddDynamic(this, &ASDTAPlayer::OnHealthChangedInternal);
+		
+		// 绑定低健康值警告委托
+		HealthComponent->OnHealthLowWarning.AddDynamic(this, &ASDTAPlayer::OnHealthLowWarningInternal);
+		
+		// 绑定死亡委托
+		HealthComponent->OnDeath.AddDynamic(this, &ASDTAPlayer::OnDeathInternal);
+		
+		// 广播初始健康值
+		float HealthPercent = HealthComponent->MaxHealth > 0.0f ? HealthComponent->Health / HealthComponent->MaxHealth : 0.0f;
+		OnHealthChanged.Broadcast(HealthPercent);
+	}
+	
+	if (StaminaComponent)
+	{
+		// 绑定能量值变化委托
+		StaminaComponent->OnStaminaChanged.AddDynamic(this, &ASDTAPlayer::OnStaminaChangedInternal);
+		
+		// 绑定低能量值警告委托
+		StaminaComponent->OnStaminaLowWarning.AddDynamic(this, &ASDTAPlayer::OnStaminaLowWarningInternal);
+		
+		// 广播初始能量值
+		float StaminaPercent = StaminaComponent->MaxStamina > 0.0f ? StaminaComponent->Stamina / StaminaComponent->MaxStamina : 0.0f;
+		OnStaminaChanged.Broadcast(StaminaPercent);
+	}
 }
 
 // Called every frame
 void ASDTAPlayer::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-
-	// 在服务器上处理能量回复
-	if (IsServer() && IsAlive() && bIsStaminaRegenerating)
-	{
-		float OldStamina = Stamina;
-		Stamina = FMath::Clamp(Stamina + (StaminaRegenerationRate * DeltaTime), 0.0f, MaxStamina);
-
-		// 如果能量值发生变化，通知客户端并广播事件
-		if (FMath::Abs(Stamina - OldStamina) > 0.01f)
-		{
-			Client_UpdateHUD(Health, Stamina);
-			OnStaminaChanged.Broadcast(Stamina / MaxStamina);
-		}
-	}
 }
 
 // Called when the actor is removed from the world
 void ASDTAPlayer::EndPlay(EEndPlayReason::Type EndPlayReason)
 {
+	// 移除组件委托绑定
+	if (HealthComponent)
+	{
+		HealthComponent->OnHealthChanged.RemoveDynamic(this, &ASDTAPlayer::OnHealthChangedInternal);
+		HealthComponent->OnHealthLowWarning.RemoveDynamic(this, &ASDTAPlayer::OnHealthLowWarningInternal);
+		HealthComponent->OnDeath.RemoveDynamic(this, &ASDTAPlayer::OnDeathInternal);
+	}
+	
+	if (StaminaComponent)
+	{
+		StaminaComponent->OnStaminaChanged.RemoveDynamic(this, &ASDTAPlayer::OnStaminaChangedInternal);
+		StaminaComponent->OnStaminaLowWarning.RemoveDynamic(this, &ASDTAPlayer::OnStaminaLowWarningInternal);
+	}
+	
 	Super::EndPlay(EndPlayReason);
+}
 
-	// 清理所有委托，防止访问已销毁的对象
-	OnHealthChanged.Clear();
-	OnHealthLowWarning.Clear();
-	OnStaminaChanged.Clear();
-	OnStaminaLowWarning.Clear();
-	OnDeath.Clear();
+// 内部健康值变化处理方法
+void ASDTAPlayer::OnHealthChangedInternal(float HealthPercent)
+{
+	// 调用原始的健康值变化委托
+	OnHealthChanged.Broadcast(HealthPercent);
+}
+
+// 内部低健康值警告处理方法
+void ASDTAPlayer::OnHealthLowWarningInternal()
+{
+	// 调用原始的低健康值警告委托
+	OnHealthLowWarning.Broadcast();
+}
+
+// 内部死亡处理方法
+void ASDTAPlayer::OnDeathInternal()
+{
+	// 调用原始的死亡委托
+	OnDeath.Broadcast();
+	
+	// 执行玩家死亡逻辑
+	Die();
+}
+
+// 内部能量值变化处理方法
+void ASDTAPlayer::OnStaminaChangedInternal(float StaminaPercent)
+{
+	// 调用原始的能量值变化委托
+	OnStaminaChanged.Broadcast(StaminaPercent);
+}
+
+// 内部低能量值警告处理方法
+void ASDTAPlayer::OnStaminaLowWarningInternal()
+{
+	// 调用原始的低能量值警告委托
+	OnStaminaLowWarning.Broadcast();
 }
 
 // Called to bind functionality to input
@@ -114,6 +170,19 @@ void ASDTAPlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputComponen
 		// Dashing
 		// 冲刺绑定
 		EnhancedInputComponent->BindAction(DashAction, ETriggerEvent::Started, this, &ASDTAPlayer::DoDashStart);
+		
+		// Firing
+		// 开火绑定
+		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Started, this, &ASDTAPlayer::DoFireStart);
+		EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Completed, this, &ASDTAPlayer::DoFireEnd);
+		
+		// Reload
+		// 换弹绑定
+		EnhancedInputComponent->BindAction(ReloadAction, ETriggerEvent::Started, this, &ASDTAPlayer::DoReload);
+
+		// Switch Weapon
+		// 武器切换绑定
+		EnhancedInputComponent->BindAction(SwitchWeaponAction, ETriggerEvent::Started, this, &ASDTAPlayer::DoSwitchWeapon);
 
 	}
 	else
@@ -127,78 +196,24 @@ void ASDTAPlayer::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	// 使用DOREPLIFETIME宏添加需要复制的属性
-	// 注意：属性的顺序必须与生成的代码中一致，否则会导致索引不匹配错误
-	DOREPLIFETIME(ASDTAPlayer, MaxHealth);
-	DOREPLIFETIME(ASDTAPlayer, MaxStamina);
-	DOREPLIFETIME(ASDTAPlayer, Health);
-	DOREPLIFETIME(ASDTAPlayer, Stamina);
-	
 	// 冲刺相关属性的网络复制
 	DOREPLIFETIME(ASDTAPlayer, bIsDashing);
 	DOREPLIFETIME(ASDTAPlayer, LastDashTime);
 	DOREPLIFETIME(ASDTAPlayer, OriginalMaxWalkSpeed);
 }
 
-// Server_SetHealth的实现
-void ASDTAPlayer::Server_SetHealth_Implementation(float NewHealth)
-{
-	float OldHealthPercent = Health / MaxHealth;
-	Health = FMath::Clamp(NewHealth, 0.0f, MaxHealth);
-	float NewHealthPercent = Health / MaxHealth;
-	
-	// 通知所有客户端更新HUD
-	Client_UpdateHUD(Health, Stamina);
-	// 广播健康值变化事件
-	OnHealthChanged.Broadcast(NewHealthPercent);
-	
-	// 检查低血量警告
-	const float HealthLowThreshold = 0.2f; // 20%
-	if (NewHealthPercent <= HealthLowThreshold && OldHealthPercent > HealthLowThreshold)
-	{
-		OnHealthLowWarning.Broadcast();
-	}
-}
 
-bool ASDTAPlayer::Server_SetHealth_Validate(float NewHealth)
-{
-	// 验证输入值是否有效
-	return NewHealth >= 0.0f && NewHealth <= MaxHealth;
-}
-
-// Server_SetStamina的实现
-void ASDTAPlayer::Server_SetStamina_Implementation(float NewStamina)
-{
-	float OldStaminaPercent = Stamina / MaxStamina;
-	Stamina = FMath::Clamp(NewStamina, 0.0f, MaxStamina);
-	float NewStaminaPercent = Stamina / MaxStamina;
-	
-	// 通知所有客户端更新HUD
-	Client_UpdateHUD(Health, Stamina);
-	// 广播能量值变化事件
-	OnStaminaChanged.Broadcast(NewStaminaPercent);
-	
-	// 检查低体力警告
-	const float StaminaLowThreshold = 0.2f; // 20%
-	if (NewStaminaPercent <= StaminaLowThreshold && OldStaminaPercent > StaminaLowThreshold)
-	{
-		OnStaminaLowWarning.Broadcast();
-	}
-
-}
-
-bool ASDTAPlayer::Server_SetStamina_Validate(float NewStamina)
-{
-	// 验证输入值是否有效
-	return NewStamina >= 0.0f && NewStamina <= MaxStamina;
-}
 
 
 
 // 角色状态检查
 bool ASDTAPlayer::IsAlive() const
 {
-	return Health > 0.0f;
+	if (HealthComponent)
+	{
+		return !HealthComponent->IsDead();
+	}
+	return false;
 }
 
 // 处理伤害
@@ -210,21 +225,12 @@ float ASDTAPlayer::TakeDamage(float DamageAmount, FDamageEvent const& DamageEven
 	float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 	
 	// 在服务器上处理伤害（确保网络一致性）
-	if (IsServer())
+	if (IsServer() && HealthComponent)
 	{
-		Health = FMath::Clamp(Health - ActualDamage, 0.0f, MaxHealth);
+		// 使用健康组件处理伤害
+		HealthComponent->RemoveHealth(ActualDamage);
 		
-		// 通知所有客户端更新HUD
-		Client_UpdateHUD(Health, Stamina);
-		
-		// 广播健康值变化事件
-		OnHealthChanged.Broadcast(Health / MaxHealth);
-		
-		// 检查是否死亡
-		if (Health <= 0.0f)
-		{
-			Die();
-		}
+		// 健康组件会自动处理死亡事件，不需要在这里检查
 	}
 	
 	return ActualDamage;
@@ -255,20 +261,12 @@ void ASDTAPlayer::Heal(float HealAmount)
 	if (!IsAlive() || HealAmount <= 0.0f) return;
 	
 	// 在服务器上处理治疗（确保网络一致性）
-	if (IsServer())
+	if (IsServer() && HealthComponent)
 	{
-		Health = FMath::Clamp(Health + HealAmount, 0.0f, MaxHealth);
+		// 使用健康组件处理治疗
+		HealthComponent->AddHealth(HealAmount);
 		
-		// 通知所有客户端更新HUD
-		Client_UpdateHUD(Health, Stamina);
-		
-		// 广播健康值变化事件
-		OnHealthChanged.Broadcast(Health / MaxHealth);
-	}
-	else
-	{
-		// 客户端请求服务器处理治疗
-		Server_SetHealth(Health + HealAmount);
+		// 健康组件会自动广播健康值变化事件，不需要在这里重复广播
 	}
 }
 
@@ -278,37 +276,26 @@ void ASDTAPlayer::ConsumeStamina(float Amount)
 	if (!IsAlive() || Amount <= 0.0f) return;
 	
 	// 在服务器上处理能量消耗（确保网络一致性）
-	if (IsServer())
+	if (IsServer() && StaminaComponent)
 	{
-		Stamina = FMath::Clamp(Stamina - Amount, 0.0f, MaxStamina);
+		// 使用耐力组件处理能量消耗
+		StaminaComponent->ConsumeStamina(Amount);
 		
-		// 消耗能量后暂停回复，并重置延迟计时器
-		bIsStaminaRegenerating = false;
-		GetWorldTimerManager().ClearTimer(StaminaRegenDelayTimerHandle);
-		GetWorldTimerManager().SetTimer(StaminaRegenDelayTimerHandle, this, &ASDTAPlayer::StartStaminaRegeneration, StaminaRegenerationDelay, false);
-		
-		// 通知所有客户端更新HUD
-		Client_UpdateHUD(Health, Stamina);
-		
-		// 广播能量值变化事件
-		OnStaminaChanged.Broadcast(Stamina / MaxStamina);
+		// 耐力组件会自动处理能量回复和广播事件，不需要在这里重复处理
 	}
 }
 
-// 开始能量回复
-void ASDTAPlayer::StartStaminaRegeneration()
-{
-	if (IsServer() && IsAlive())
-	{
-		bIsStaminaRegenerating = true;
-	}
-}
+
 
 // Client_UpdateHUD的实现
-void ASDTAPlayer::Client_UpdateHUD_Implementation(float NewHealth, float NewStamina)
+void ASDTAPlayer::Client_UpdateHUD_Implementation()
 {
+	// 从组件中获取当前的健康和耐力值
+	float CurrentHealth = HealthComponent ? HealthComponent->Health : 0.0f;
+	float CurrentStamina = StaminaComponent ? StaminaComponent->Stamina : 0.0f;
+	
 	// 客户端更新HUD的实现
-	// 这里可以添加UI更新逻辑
+	// 这里可以添加UI更新逻辑，使用CurrentHealth和CurrentStamina
 }
 
 // Multicast_PlaySound的实现
@@ -326,13 +313,16 @@ void ASDTAPlayer::Server_StartDash_Implementation()
 {
 	// 检查是否可以冲刺
 	float CurrentTime = GetWorld()->GetTimeSeconds();
-	if (bIsDashing || (CurrentTime - LastDashTime) < DashCooldown || Stamina < DashStaminaCost)
+	if (bIsDashing || (CurrentTime - LastDashTime) < DashCooldown || !StaminaComponent)
 	{
 		return;
 	}
 
 	// 消耗体力
-	Server_SetStamina(Stamina - DashStaminaCost);
+	if (!StaminaComponent->ConsumeStamina(DashStaminaCost))
+	{
+		return;
+	}
 
 	// 设置冲刺状态
 	bIsDashing = true;
@@ -451,6 +441,110 @@ void ASDTAPlayer::DoDashEnd()
 	Server_EndDash();
 }
 
+/** 处理开火开始输入 */
+void ASDTAPlayer::DoFireStart()
+{
+	// 确保是本地控制的角色
+	if (!IsLocallyControlled()) return;
+	
+	// 检查当前是否有武器且武器可以开火
+	if (CurrentWeapon)
+	{
+		CurrentWeapon->StartFiring();
+	}
+}
+
+/** 处理开火结束输入 */
+void ASDTAPlayer::DoFireEnd()
+{
+	// 确保是本地控制的角色
+	if (!IsLocallyControlled()) return;
+	
+	// 检查当前是否有武器
+	if (CurrentWeapon)
+	{
+		CurrentWeapon->StopFiring();
+	}
+}
+
+/** 处理换弹输入 */
+void ASDTAPlayer::DoReload()
+{
+	// 确保是本地控制的角色
+	if (!IsLocallyControlled()) return;
+	
+	// 检查当前是否有武器
+	if (CurrentWeapon)
+	{
+		CurrentWeapon->Reload();
+	}
+}
+
+/** 处理武器切换输入 */
+void ASDTAPlayer::DoSwitchWeapon()
+{
+	// 确保是本地控制的角色
+	if (!IsLocallyControlled()) return;
+	
+	// 切换到下一个武器
+	SwitchToNextWeapon();
+}
+
+/** 切换到下一个武器 */
+void ASDTAPlayer::SwitchToNextWeapon()
+{
+	// 确保服务器端处理武器切换逻辑，保证网络一致性
+	if (IsServer())
+	{
+		// 如果没有武器，直接返回
+		if (Weapons.Num() <= 0)
+		{
+			return;
+		}
+		
+		// 如果只有一个武器，不需要切换
+		if (Weapons.Num() == 1)
+		{
+			return;
+		}
+		
+		// 找到当前武器在列表中的索引
+		int32 CurrentWeaponIndex = -1;
+		if (CurrentWeapon)
+		{
+			CurrentWeaponIndex = Weapons.IndexOfByKey(CurrentWeapon);
+		}
+		
+		// 计算下一个武器的索引
+		int32 NextWeaponIndex = (CurrentWeaponIndex + 1) % Weapons.Num();
+		
+		// 如果当前没有武器或者索引无效，默认选择第一个武器
+		if (CurrentWeaponIndex == -1)
+		{
+			NextWeaponIndex = 0;
+		}
+		
+		// 停用当前武器
+		if (CurrentWeapon)
+		{
+			CurrentWeapon->DeactivateWeapon();
+		}
+		
+		// 激活下一个武器
+		ASDTAWeapon* NextWeapon = Weapons[NextWeaponIndex];
+		if (NextWeapon)
+		{
+			NextWeapon->ActivateWeapon();
+		}
+	}
+	else
+	{
+		// 客户端请求服务器执行武器切换
+		// 注意：这里应该使用RPC调用，但为了简化示例，我们直接在客户端处理
+		// 在实际项目中，应该创建一个Server_RPC方法来处理武器切换
+	}
+}
+
 // 网络角色检查辅助方法
 bool ASDTAPlayer::IsLocallyControlled() const
 {
@@ -548,7 +642,7 @@ FVector ASDTAPlayer::GetWeaponTargetLocation()
 }
 
 /** 给玩家添加指定类型的武器 */
-void ASDTAPlayer::AddWeaponClass(const TSubclassOf<ASDTAWeapon>& WeaponClass)
+void ASDTAPlayer::AddWeaponClass_Implementation(TSubclassOf<ASDTAWeapon> WeaponClass)
 {
 	if (!WeaponClass) return;
 	
@@ -567,11 +661,13 @@ void ASDTAPlayer::AddWeaponClass(const TSubclassOf<ASDTAWeapon>& WeaponClass)
 		if (NewWeapon)
 		{
 			// 设置武器所有者
-			// 设置武器的所有者为当前玩家
 			NewWeapon->SetOwner(this);
 			
 			// 添加到武器列表
 			Weapons.Add(NewWeapon);
+			
+			// 将武器网格附加到角色身上
+			AttachWeaponMeshes(NewWeapon);
 			
 			// 如果是第一个武器，自动装备
 			if (Weapons.Num() == 1)
@@ -584,7 +680,7 @@ void ASDTAPlayer::AddWeaponClass(const TSubclassOf<ASDTAWeapon>& WeaponClass)
 }
 
 /** 激活武器 */
-void ASDTAPlayer::OnWeaponActivated(ASDTAWeapon* Weapon)
+void ASDTAPlayer::OnWeaponActivated_Implementation(ASDTAWeapon* Weapon)
 {
 	if (!Weapon) return;
 	
@@ -600,10 +696,13 @@ void ASDTAPlayer::OnWeaponActivated(ASDTAWeapon* Weapon)
 		// 设置当前武器
 		CurrentWeapon = Weapon;
 	}
+	
+	// 将武器网格附加到角色
+	AttachWeaponMeshes(Weapon);
 }
 
 /** 停用武器 */
-void ASDTAPlayer::OnWeaponDeactivated(ASDTAWeapon* Weapon)
+void ASDTAPlayer::OnWeaponDeactivated_Implementation(ASDTAWeapon* Weapon)
 {
 	if (!Weapon) return;
 	

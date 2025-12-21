@@ -17,11 +17,20 @@ USDTAPoolManager::USDTAPoolManager()
 void USDTAPoolManager::Initialize(UWorld* InWorld)
 {
 	World = InWorld;
+	
+	// 检查是否在服务器上运行
+	if (World && World->GetNetMode() != NM_DedicatedServer && World->GetNetMode() != NM_ListenServer)
+	{
+
+
+		// 如果不在服务器上，禁用对象池功能
+		World = nullptr;
+	}
 }
 
 void USDTAPoolManager::InitPoolForClass(TSubclassOf<UObject> ObjectClass, int32 InitialSize, int32 MaxSize)
 {
-	if (!ObjectClass || InitialSize < 0)
+	if (!World || !ObjectClass || InitialSize < 0)
 	{
 		return;
 	}
@@ -114,7 +123,7 @@ UObject* USDTAPoolManager::GetObject(TSubclassOf<UObject> ObjectClass)
 
 bool USDTAPoolManager::ReturnObject(UObject* Object)
 {
-	if (!Object)
+	if (!World || !Object)
 	{
 		return false;
 	}
@@ -149,6 +158,11 @@ bool USDTAPoolManager::ReturnObject(UObject* Object)
 		Actor->SetActorHiddenInGame(true);
 		Actor->SetActorEnableCollision(false);
 		Actor->SetActorTickEnabled(false);
+		
+		// 保持网络复制属性正确设置
+		Actor->SetReplicates(true);
+		Actor->SetReplicateMovement(true);
+		
 		Actor->SetActorLocation(FVector::ZeroVector);
 		Actor->SetActorRotation(FRotator::ZeroRotator);
 	}
@@ -266,7 +280,18 @@ UObject* USDTAPoolManager::CreateNewObject(TSubclassOf<UObject> ObjectClass)
 		NewObject = World->SpawnActorDeferred<AActor>(ObjectClass, FTransform::Identity);
 		if (NewObject)
 		{
-			Cast<AActor>(NewObject)->FinishSpawning(FTransform::Identity);
+			AActor* NewActor = Cast<AActor>(NewObject);
+			// 设置网络复制属性
+			NewActor->SetReplicates(true);
+			NewActor->SetReplicateMovement(true);
+			
+			// 完成Actor生成
+			NewActor->FinishSpawning(FTransform::Identity);
+			
+			// 初始隐藏状态，减少不必要的渲染开销
+			NewActor->SetActorHiddenInGame(true);
+			NewActor->SetActorEnableCollision(false);
+			NewActor->SetActorTickEnabled(false);
 		}
 	}
 	else
@@ -285,7 +310,7 @@ UObject* USDTAPoolManager::CreateNewObject(TSubclassOf<UObject> ObjectClass)
 
 void USDTAPoolManager::ResetObject(UObject* Object)
 {
-	if (!Object)
+	if (!World || !Object)
 	{
 		return;
 	}
@@ -301,6 +326,10 @@ void USDTAPoolManager::ResetObject(UObject* Object)
 		Actor->SetActorEnableCollision(true);
 		Actor->SetActorTickEnabled(true);
 		Actor->SetActorHiddenInGame(false);
+
+		// 重置网络复制属性
+		Actor->SetReplicates(true);
+		Actor->SetReplicateMovement(true);
 
 		// 重置运动组件
 		UProjectileMovementComponent* ProjectileMovementComp = Actor->FindComponentByClass<UProjectileMovementComponent>();

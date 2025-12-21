@@ -7,6 +7,7 @@
 #include "Containers/Array.h"
 #include "Containers/Map.h"
 #include "Templates/Function.h"
+#include "Net/UnrealNetwork.h"
 #include "SDTAPoolManager.generated.h"
 
 /**

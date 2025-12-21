@@ -123,8 +123,11 @@ void ASDTAPlayerController::OnPossess(APawn* InPawn)
 		SDTAPlayer->OnDeath.AddDynamic(this, &ASDTAPlayerController::OnPawnDeath);
 
 		// force update the health and stamina bars
-		SDTAPlayer->OnHealthChanged.Broadcast(SDTAPlayer->Health / SDTAPlayer->MaxHealth);
-		SDTAPlayer->OnStaminaChanged.Broadcast(SDTAPlayer->Stamina / SDTAPlayer->MaxStamina);
+		float HealthPercent = SDTAPlayer->HealthComponent ? (SDTAPlayer->HealthComponent->Health / SDTAPlayer->HealthComponent->MaxHealth) : 0.0f;
+		SDTAPlayer->OnHealthChanged.Broadcast(HealthPercent);
+
+		float StaminaPercent = SDTAPlayer->StaminaComponent ? (SDTAPlayer->StaminaComponent->Stamina / SDTAPlayer->StaminaComponent->MaxStamina) : 0.0f;
+		SDTAPlayer->OnStaminaChanged.Broadcast(StaminaPercent);
 	}
 }
 
@@ -233,8 +236,8 @@ void ASDTAPlayerController::OnHealthChanged(float HealthPercent)
 			PlayerHUD->HealthPercent = HealthPercent;
 
 			// 将当前值转换为整数
-			int32 CurrentHealthInt = FMath::RoundToInt(SDTAPlayer->Health);
-			int32 MaxHealthInt = FMath::RoundToInt(SDTAPlayer->MaxHealth);
+			int32 CurrentHealthInt = SDTAPlayer->HealthComponent ? FMath::RoundToInt(SDTAPlayer->HealthComponent->Health) : 0;
+			int32 MaxHealthInt = SDTAPlayer->HealthComponent ? FMath::RoundToInt(SDTAPlayer->HealthComponent->MaxHealth) : 0;
 
 			// 只有当整数部分变化时才更新HUD的当前值和最大值
 			if (CurrentHealthInt != LastHealthInt || MaxHealthInt != LastMaxHealthInt)
@@ -264,8 +267,8 @@ void ASDTAPlayerController::OnStaminaChanged(float StaminaPercent)
 			PlayerHUD->StaminaPercent = StaminaPercent;
 
 			// 将当前值转换为整数
-			int32 CurrentStaminaInt = FMath::RoundToInt(SDTAPlayer->Stamina);
-			int32 MaxStaminaInt = FMath::RoundToInt(SDTAPlayer->MaxStamina);
+			int32 CurrentStaminaInt = SDTAPlayer->StaminaComponent ? FMath::RoundToInt(SDTAPlayer->StaminaComponent->Stamina) : 0;
+			int32 MaxStaminaInt = SDTAPlayer->StaminaComponent ? FMath::RoundToInt(SDTAPlayer->StaminaComponent->MaxStamina) : 0;
 
 			// 只有当整数部分变化时才更新HUD的当前值和最大值
 			if (CurrentStaminaInt != LastStaminaInt || MaxStaminaInt != LastMaxStaminaInt)

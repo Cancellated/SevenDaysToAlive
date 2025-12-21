@@ -72,7 +72,26 @@ void ASDTAWeapon::OnOwnerDestroyed(AActor* DestroyedActor)
 // 激活此武器并准备开火
 void ASDTAWeapon::ActivateWeapon()
 {
-	// 基本实现占位符
+	// 设置武器为可见
+	SetActorHiddenInGame(false);
+	SetActorEnableCollision(true);
+	SetActorTickEnabled(true);
+
+	// 激活第一人称网格
+	if (FirstPersonMesh)
+	{
+		FirstPersonMesh->SetHiddenInGame(false);
+		FirstPersonMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
+	// 激活第三人称网格
+	if (ThirdPersonMesh)
+	{
+		ThirdPersonMesh->SetHiddenInGame(false);
+		ThirdPersonMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
+	// 通知武器所有者武器已激活
 	if (WeaponOwner)
 	{
 		WeaponOwner->OnWeaponActivated(this);
@@ -82,13 +101,33 @@ void ASDTAWeapon::ActivateWeapon()
 // 停用此武器
 void ASDTAWeapon::DeactivateWeapon()
 {
-	// 基本实现占位符
+	// 停止当前的开火动作
+	StopFiring();
+
+	// 设置武器为隐藏
+	SetActorHiddenInGame(true);
+	SetActorEnableCollision(false);
+	SetActorTickEnabled(false);
+
+	// 隐藏第一人称网格
+	if (FirstPersonMesh)
+	{
+		FirstPersonMesh->SetHiddenInGame(true);
+		FirstPersonMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
+	// 隐藏第三人称网格
+	if (ThirdPersonMesh)
+	{
+		ThirdPersonMesh->SetHiddenInGame(true);
+		ThirdPersonMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
+	// 通知武器所有者武器已停用
 	if (WeaponOwner)
 	{
 		WeaponOwner->OnWeaponDeactivated(this);
 	}
-
-	StopFiring();
 }
 
 // 开始开火
@@ -118,6 +157,22 @@ void ASDTAWeapon::StopFiring()
 	// Basic implementation placeholder
 	bIsFiring = false;
 	GetWorldTimerManager().ClearTimer(RefireTimer);
+}
+
+// 重新装填武器
+void ASDTAWeapon::Reload()
+{
+	// 停止当前的开火动作
+	StopFiring();
+
+	// 重新装填子弹到弹夹容量
+	CurrentBullets = MagazineSize;
+
+	// 更新HUD显示新的子弹数量
+	if (WeaponOwner)
+	{
+		WeaponOwner->UpdateWeaponHUD(CurrentBullets, MagazineSize);
+	}
 }
 
 // 开火
