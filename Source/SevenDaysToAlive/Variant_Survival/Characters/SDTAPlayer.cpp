@@ -47,9 +47,8 @@ ASDTAPlayer::ASDTAPlayer()
 		bUseControllerRotationRoll = false;
 	}
 	
-	// 设置武器附着的默认插座名称
-	WeaponAttachSocketName = TEXT("WeaponSocket");
-	// 对于第一人称角色，也可以使用 "GripPoint" 或其他适合的插座名
+	// 设置武器附着的默认插座名称（参考Shooter模板）
+	WeaponAttachSocketName = FName("HandGrip_R");
 }
 
 // Called when the game starts or when spawned
@@ -570,18 +569,23 @@ void ASDTAPlayer::AttachWeaponMeshes(ASDTAWeapon* Weapon)
 {
 	if (!Weapon) return;
 	
+	const FAttachmentTransformRules AttachmentRule(EAttachmentRule::SnapToTarget, false);
+
+	// 将武器Actor附加到角色上（复刻Shooter模板的核心逻辑）
+	Weapon->AttachToActor(this, AttachmentRule);
+
 	// 附加第一人称武器网格到角色的第一人称Mesh组件
 	USkeletalMeshComponent* FPWeaponMesh = Weapon->GetFirstPersonMesh();
-	if (FPWeaponMesh)
+	if (FPWeaponMesh && GetFirstPersonMesh())
 	{
-		FPWeaponMesh->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, WeaponAttachSocketName);
+		FPWeaponMesh->AttachToComponent(GetFirstPersonMesh(), AttachmentRule, WeaponAttachSocketName);
 	}
 	
 	// 附加第三人称武器网格到角色的Mesh组件
 	USkeletalMeshComponent* TPWeaponMesh = Weapon->GetThirdPersonMesh();
 	if (TPWeaponMesh)
 	{
-		TPWeaponMesh->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, WeaponAttachSocketName);
+		TPWeaponMesh->AttachToComponent(GetMesh(), AttachmentRule, WeaponAttachSocketName);
 	}
 }
 
@@ -696,6 +700,15 @@ void ASDTAPlayer::OnWeaponActivated_Implementation(ASDTAWeapon* Weapon)
 		// 设置当前武器
 		CurrentWeapon = Weapon;
 	}
+	
+	// 设置角色网格的AnimInstance类（复刻Shooter模板的核心逻辑）
+	USkeletalMeshComponent* FirstPersonCharacterMesh = GetFirstPersonMesh();
+	if (FirstPersonCharacterMesh)
+	{
+		FirstPersonCharacterMesh->SetAnimInstanceClass(Weapon->GetFirstPersonAnimInstanceClass());
+	}
+	
+	GetMesh()->SetAnimInstanceClass(Weapon->GetThirdPersonAnimInstanceClass());
 	
 	// 将武器网格附加到角色
 	AttachWeaponMeshes(Weapon);

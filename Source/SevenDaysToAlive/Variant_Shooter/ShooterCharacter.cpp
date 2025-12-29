@@ -170,10 +170,10 @@ void AShooterCharacter::AttachWeaponMeshes(AShooterWeapon* Weapon)
 {
 	const FAttachmentTransformRules AttachmentRule(EAttachmentRule::SnapToTarget, false);
 
-	// attach the weapon actor
+	// 将武器actor附加到角色actor上
 	Weapon->AttachToActor(this, AttachmentRule);
 
-	// attach the weapon meshes
+	// 将武器的第一人称和第三人称网格组件附加到角色的第一人称和第三人称网格组件上
 	Weapon->GetFirstPersonMesh()->AttachToComponent(GetFirstPersonMesh(), AttachmentRule, FirstPersonWeaponSocket);
 	Weapon->GetThirdPersonMesh()->AttachToComponent(GetMesh(), AttachmentRule, FirstPersonWeaponSocket);
 	
@@ -248,10 +248,10 @@ void AShooterCharacter::AddWeaponClass(const TSubclassOf<AShooterWeapon>& Weapon
 
 void AShooterCharacter::OnWeaponActivated(AShooterWeapon* Weapon)
 {
-	// update the bullet counter
+	// 更新武器的弹药计数器UI
 	OnBulletCountUpdated.Broadcast(Weapon->GetMagazineSize(), Weapon->GetBulletCount());
 
-	// set the character mesh AnimInstances
+	// 设置角色网格的AnimInstance
 	GetFirstPersonMesh()->SetAnimInstanceClass(Weapon->GetFirstPersonAnimInstanceClass());
 	GetMesh()->SetAnimInstanceClass(Weapon->GetThirdPersonAnimInstanceClass());
 }
