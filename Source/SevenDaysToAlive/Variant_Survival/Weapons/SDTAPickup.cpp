@@ -2,6 +2,7 @@
 
 
 #include "Variant_Survival/Weapons/SDTAPickup.h"
+#include "SevenDaysToAlive.h"
 #include "Components/SceneComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -64,6 +65,8 @@ void ASDTAPickup::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 
+	UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAPickup] %s - EndPlay，原因: %d"), *GetName(), (int32)EndPlayReason);
+
 	// 清除重生计时器
 	GetWorld()->GetTimerManager().ClearTimer(RespawnTimer);
 }
@@ -91,6 +94,8 @@ void ASDTAPickup::OnOverlap(UPrimitiveComponent* OverlappedComponent, AActor* Ot
 
 void ASDTAPickup::RespawnPickup()
 {
+	UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAPickup] %s - 重生开始"), *GetName());
+
 	// 显示这个拾取物
 	SetActorHiddenInGame(false);
 
@@ -100,6 +105,8 @@ void ASDTAPickup::RespawnPickup()
 
 void ASDTAPickup::FinishRespawn()
 {
+	UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAPickup] %s - 重生完成，重新启用碰撞和Tick"), *GetName());
+
 	// 启用碰撞
 	SetActorEnableCollision(true);
 

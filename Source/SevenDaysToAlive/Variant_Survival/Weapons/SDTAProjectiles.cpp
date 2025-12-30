@@ -2,6 +2,7 @@
 
 
 #include "Variant_Survival/Weapons/SDTAProjectiles.h"
+#include "SevenDaysToAlive.h"
 #include "Components/SphereComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "GameFramework/Character.h"
@@ -49,6 +50,9 @@ void ASDTAProjectiles::BeginPlay()
 {
 	Super::BeginPlay();
 	
+	UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAProjectiles] %s - BeginPlay开始，弹道类型: %d"), 
+		*GetName(), (int32)ProjectileType);
+	
 	// 忽略发射者，避免子弹立即击中自己
 	CollisionComponent->IgnoreActorWhenMoving(GetInstigator(), true);
 
@@ -57,6 +61,8 @@ void ASDTAProjectiles::BeginPlay()
 	{
 		// 实体子弹：启用运动组件并设置初始速度
 		ProjectileMovement->SetVelocityInLocalSpace(FireDirection * ProjectileSpeed);
+		UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAProjectiles] %s - 实体子弹初始化完成，方向: %s"), 
+			*GetName(), *FireDirection.ToString());
 	}
 	else
 	{
@@ -64,6 +70,7 @@ void ASDTAProjectiles::BeginPlay()
 		CollisionComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		ProjectileMovement->SetActive(false);
 		PrimaryActorTick.SetTickFunctionEnable(false);
+		UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAProjectiles] %s - 即时弹道初始化完成，已禁用碰撞和Tick"), *GetName());
 	}
 }
 
@@ -197,6 +204,9 @@ void ASDTAProjectiles::PerformInstantHit()
 /** 查找爆炸半径内的演员并伤害他们 */
 void ASDTAProjectiles::ExplosionCheck(const FVector& ExplosionCenter)
 {
+	UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAProjectiles] %s - 执行爆炸检测，中心: %s，半径: %.2f"), 
+		*GetName(), *ExplosionCenter.ToString(), ExplosionRadius);
+
 	// 执行球体重叠检查，查找附近的演员
 	TArray<FOverlapResult> Overlaps;
 
@@ -228,6 +238,9 @@ void ASDTAProjectiles::ExplosionCheck(const FVector& ExplosionCenter)
 		{
 			DamagedActors.Add(CurrentOverlap.GetActor());
 
+			UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAProjectiles] %s - 爆炸命中: %s"), 
+				*GetName(), CurrentOverlap.GetActor() ? *CurrentOverlap.GetActor()->GetName() : TEXT("无"));
+
 			// 计算爆炸方向
 			const FVector& ExplosionDir = CurrentOverlap.GetActor()->GetActorLocation() - GetActorLocation();
 
@@ -235,6 +248,8 @@ void ASDTAProjectiles::ExplosionCheck(const FVector& ExplosionCenter)
 			ProcessHit(CurrentOverlap.GetActor(), CurrentOverlap.GetComponent(), GetActorLocation(), ExplosionDir.GetSafeNormal());
 		}
 	}
+
+	UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAProjectiles] %s - 爆炸共命中 %d 个目标"), *GetName(), DamagedActors.Num());
 }
 
 /** 处理子弹命中 */
@@ -245,6 +260,9 @@ void ASDTAProjectiles::ProcessHit(AActor* HitActor, UPrimitiveComponent* HitComp
 	{
 		return;
 	}
+
+	UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAProjectiles] %s - 处理命中: %s，伤害: %.2f"), 
+		*GetName(), *HitActor->GetName(), HitDamage);
 
 	// 检查是否命中了角色
 	if (ACharacter* HitCharacter = Cast<ACharacter>(HitActor))
@@ -257,6 +275,8 @@ void ASDTAProjectiles::ProcessHit(AActor* HitActor, UPrimitiveComponent* HitComp
 			{
 				// 应用伤害
 				UGameplayStatics::ApplyDamage(HitCharacter, HitDamage, GetInstigator()->GetController(), this, HitDamageType);
+				UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAProjectiles] %s - 已对 %s 造成 %.2f 伤害"), 
+					*GetName(), *HitCharacter->GetName(), HitDamage);
 			}
 		}
 	}
@@ -266,12 +286,17 @@ void ASDTAProjectiles::ProcessHit(AActor* HitActor, UPrimitiveComponent* HitComp
 	{
 		// 给物体施加物理冲量，产生击退效果
 		HitComp->AddImpulseAtLocation(HitDirection * PhysicsForce, HitLocation);
+		UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAProjectiles] %s - 已对物理物体施加冲量: %.2f"), 
+			*GetName(), PhysicsForce);
 	}
 }
 
 /** 延迟销毁子弹 */
 void ASDTAProjectiles::OnDeferredDestruction()
 {
+	UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAProjectiles] %s - 销毁子弹，对象池: %s"), 
+		*GetName(), PoolManager ? TEXT("有效") : TEXT("无效"));
+
 	// 如果有对象池管理器，返回对象池，否则直接销毁
 	if (PoolManager)
 	{

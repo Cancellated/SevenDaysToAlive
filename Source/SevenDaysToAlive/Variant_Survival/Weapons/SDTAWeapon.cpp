@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Variant_Survival/Weapons/SDTAWeapon.h"
+#include "SevenDaysToAlive.h"
 
 // 设置默认值
 ASDTAWeapon::ASDTAWeapon()
@@ -24,6 +25,8 @@ void ASDTAWeapon::BeginPlay()
 {
 	Super::BeginPlay();
 
+	UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAWeapon] %s - BeginPlay开始"), *GetName());
+
 	// 初始化武器属性
 	CurrentBullets = MagazineSize;
 
@@ -34,13 +37,28 @@ void ASDTAWeapon::BeginPlay()
 		WeaponOwner = Cast<ISDTAWeaponHolder>(OwnerActor);
 		PawnOwner = Cast<APawn>(OwnerActor);
 
+		UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAWeapon] %s - 找到所有者: %s, WeaponHolder: %s"), 
+			*GetName(), *OwnerActor->GetName(), WeaponOwner ? TEXT("有效") : TEXT("无效"));
+
 		// 监听所有者销毁事件
 		OwnerActor->OnDestroyed.AddDynamic(this, &ASDTAWeapon::OnOwnerDestroyed);
 	}
+	else
+	{
+		UE_LOG(LogSevenDaysToAlive, Warning, TEXT("[SDTAWeapon] %s - 未找到所有者"), *GetName());
+	}
+
+	// 记录动画实例类配置
+	UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAWeapon] %s - FirstPersonAnimInstanceClass: %s, ThirdPersonAnimInstanceClass: %s"), 
+		*GetName(), 
+		FirstPersonAnimInstanceClass ? *FirstPersonAnimInstanceClass->GetName() : TEXT("未设置"),
+		ThirdPersonAnimInstanceClass ? *ThirdPersonAnimInstanceClass->GetName() : TEXT("未设置"));
 
 	// 初始化对象池管理器
 	if (ProjectileClass)
 	{
+		UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAWeapon] %s - 投射物类: %s"), *GetName(), *ProjectileClass->GetName());
+		
 		// 创建或获取对象池管理器
 		PoolManager = NewObject<USDTAPoolManager>(GetTransientPackage());
 		if (PoolManager)
@@ -48,6 +66,7 @@ void ASDTAWeapon::BeginPlay()
 			PoolManager->Initialize(GetWorld());
 			// 为投射物初始化对象池，初始大小10，最大大小50
 			PoolManager->InitPoolForClass(ProjectileClass, 10, 50);
+			UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAWeapon] %s - 对象池初始化成功"), *GetName());
 		}
 	}
 }
@@ -72,6 +91,8 @@ void ASDTAWeapon::OnOwnerDestroyed(AActor* DestroyedActor)
 // 激活此武器并准备开火
 void ASDTAWeapon::ActivateWeapon()
 {
+	UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAWeapon] %s - ActivateWeapon开始"), *GetName());
+
 	// 设置武器为可见
 	SetActorHiddenInGame(false);
 	SetActorEnableCollision(true);
@@ -82,6 +103,11 @@ void ASDTAWeapon::ActivateWeapon()
 	{
 		FirstPersonMesh->SetHiddenInGame(false);
 		FirstPersonMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAWeapon] %s - 第一人称网格已激活"), *GetName());
+	}
+	else
+	{
+		UE_LOG(LogSevenDaysToAlive, Error, TEXT("[SDTAWeapon] %s - 第一人称网格无效"), *GetName());
 	}
 
 	// 激活第三人称网格
@@ -89,13 +115,25 @@ void ASDTAWeapon::ActivateWeapon()
 	{
 		ThirdPersonMesh->SetHiddenInGame(false);
 		ThirdPersonMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAWeapon] %s - 第三人称网格已激活"), *GetName());
+	}
+	else
+	{
+		UE_LOG(LogSevenDaysToAlive, Error, TEXT("[SDTAWeapon] %s - 第三人称网格无效"), *GetName());
 	}
 
 	// 通知武器所有者武器已激活
 	if (WeaponOwner)
 	{
+		UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAWeapon] %s - 通知武器所有者激活"), *GetName());
 		WeaponOwner->OnWeaponActivated(this);
 	}
+	else
+	{
+		UE_LOG(LogSevenDaysToAlive, Error, TEXT("[SDTAWeapon] %s - 武器所有者无效，无法通知激活"), *GetName());
+	}
+
+	UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAWeapon] %s - ActivateWeapon完成"), *GetName());
 }
 
 // 停用此武器
