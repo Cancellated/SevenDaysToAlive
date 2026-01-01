@@ -81,7 +81,7 @@ void ASDTAProjectiles::EndPlay(EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 
 	// 清除延迟销毁定时器，避免内存泄漏
-	if (GetWorld())
+	if (GetWorld() && GetWorld()->GetTimerManager().IsTimerActive(DestructionTimer))
 	{
 		GetWorld()->GetTimerManager().ClearTimer(DestructionTimer);
 	}
@@ -320,8 +320,8 @@ void ASDTAProjectiles::OnDeferredDestruction()
 	UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAProjectiles] %s - 销毁子弹，对象池: %s"), 
 		*GetName(), PoolManager ? TEXT("有效") : TEXT("无效"));
 
-	// 如果有对象池管理器，返回对象池，否则直接销毁
-	if (PoolManager)
+	// 安全检查：确保对象池管理器仍然有效
+	if (PoolManager && IsValid(PoolManager))
 	{
 		PoolManager->ReturnObject(this);
 	}
