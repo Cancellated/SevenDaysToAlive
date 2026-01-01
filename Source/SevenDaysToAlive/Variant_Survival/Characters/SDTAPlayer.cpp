@@ -3,6 +3,7 @@
 
 #include "Variant_Survival/Characters/SDTAPlayer.h"
 #include "Variant_Survival/Weapons/SDTAWeapon.h"
+#include "Variant_Survival/Controller/SDTAPlayerController.h"
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -109,6 +110,24 @@ void ASDTAPlayer::BeginPlay()
 		
 		UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAPlayer] %s - 耐力组件委托已绑定，初始耐力: %.2f/%.2f (%.1f%%)"), 
 			*GetName(), StaminaComponent->Stamina, StaminaComponent->MaxStamina, StaminaPercent * 100.0f);
+	}
+	
+	// 自动装备初始武器
+	if (bEquipStartingWeaponOnSpawn && StartingWeaponClass)
+	{
+		UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAPlayer] %s - 准备自动装备初始武器: %s"), 
+			*GetName(), *StartingWeaponClass->GetName());
+		
+		// 添加初始武器（使用Execute_前缀调用接口事件）
+		ISDTAWeaponHolder::Execute_AddWeaponClass(this, StartingWeaponClass);
+	}
+	else if (!bEquipStartingWeaponOnSpawn)
+	{
+		UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAPlayer] %s - 自动装备初始武器功能已禁用"), *GetName());
+	}
+	else if (!StartingWeaponClass)
+	{
+		UE_LOG(LogSevenDaysToAlive, Warning, TEXT("[SDTAPlayer] %s - 自动装备初始武器失败: 未设置初始武器类"), *GetName());
 	}
 }
 
@@ -761,8 +780,15 @@ void ASDTAPlayer::UpdateWeaponHUD(int32 CurrentAmmo, int32 MagazineSize)
 	// 在客户端上更新HUD
 	if (IsLocallyControlled())
 	{
-		// 这里可以添加更新HUD的逻辑
-		// 例如调用UI更新函数或触发事件
+		// 获取玩家控制器并更新武器计数器UI
+		if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
+		{
+			// 调用控制器的UI更新方法
+			if (ASDTAPlayerController* SDTAController = Cast<ASDTAPlayerController>(PlayerController))
+			{
+				SDTAController->UpdateWeaponCounterUI(CurrentAmmo, MagazineSize);
+			}
+		}
 	}
 }
 
@@ -823,6 +849,9 @@ void ASDTAPlayer::AddWeaponClass_Implementation(TSubclassOf<ASDTAWeapon> WeaponC
 		{
 			// 设置武器所有者
 			NewWeapon->SetOwner(this);
+			
+			// 初始化武器所有者（解决时序问题）
+			NewWeapon->InitializeWeaponOwner();
 			
 			// 添加到武器列表
 			Weapons.Add(NewWeapon);

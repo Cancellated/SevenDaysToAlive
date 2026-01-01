@@ -144,6 +144,9 @@ public:
 	/** 停用此武器 */
 	void DeactivateWeapon();
 
+	/** 初始化武器所有者（在SetOwner之后调用） */
+	void InitializeWeaponOwner();
+
 	/** 开始开火 */
 	void StartFiring();
 

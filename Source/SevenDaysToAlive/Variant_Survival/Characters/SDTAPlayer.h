@@ -7,12 +7,14 @@
 #include "EnhancedInputComponent.h"
 #include "InputAction.h"
 #include "Delegates/DelegateCombinations.h"
-#include "Net/UnrealNetwork.h" // 添加网络相关头文件
-#include "TimerManager.h" // 添加定时器头文件
+#include "Net/UnrealNetwork.h"
+#include "TimerManager.h"
 #include "Variant_Survival/Components/HealthComponent.h"
 #include "Variant_Survival/Components/StaminaSystemComponent.h"
 #include "Variant_Survival/Weapons/SDTAWeaponHolder.h"
 #include "SDTAPlayer.generated.h"
+
+class ASDTAWeapon;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHealthChanged, float, HealthPercent);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnHealthLowWarning);
@@ -235,6 +237,14 @@ protected:
 	/** 武器附着的插座名称 */
 	UPROPERTY(EditDefaultsOnly, Category = "Weapons")
 	FName WeaponAttachSocketName;
+
+	/** 初始武器类，游戏开始时自动装备 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Weapons")
+	TSubclassOf<class ASDTAWeapon> StartingWeaponClass;
+
+	/** 是否在游戏开始时自动装备初始武器 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Weapons")
+	bool bEquipStartingWeaponOnSpawn;
 
 	//~Begin ISDTAWeaponHolder interface
 

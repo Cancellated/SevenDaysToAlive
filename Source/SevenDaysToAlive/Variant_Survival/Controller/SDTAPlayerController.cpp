@@ -73,6 +73,21 @@ void ASDTAPlayerController::BeginPlay()
 				UE_LOG(LogSevenDaysToAlive, Warning, TEXT("Could not spawn Debug UI widget."));
 			}
 		}
+
+		// 创建武器UI（如果指定了UI类）
+		if (WeaponUIWidgetClass)
+		{
+			WeaponUI = CreateWidget<USDTAWeaponUI>(this, WeaponUIWidgetClass);
+			if (WeaponUI)
+			{
+				WeaponUI->AddToPlayerScreen(0); // 与HUD同一层级
+				UE_LOG(LogSevenDaysToAlive, Log, TEXT("Weapon UI created successfully"));
+			}
+			else
+			{
+				UE_LOG(LogSevenDaysToAlive, Warning, TEXT("Could not spawn Weapon UI widget."));
+			}
+		}
 	}
 }
 
@@ -317,5 +332,23 @@ void ASDTAPlayerController::Tick(float DeltaSeconds)
 ASDTAPlayer* ASDTAPlayerController::GetControlledSDTAPlayer() const
 {
 	return Cast<ASDTAPlayer>(GetPawn());
+}
+
+void ASDTAPlayerController::UpdateWeaponCounterUI(int32 CurrentAmmo, int32 MagazineSize)
+{
+	if (WeaponUI)
+	{
+		// 直接设置属性，属性变化会自动触发回调更新UI
+		WeaponUI->CurrentAmmo = CurrentAmmo;
+		WeaponUI->MagazineSize = MagazineSize;
+	}
+}
+
+void ASDTAPlayerController::ShowHitFeedback()
+{
+	if (WeaponUI)
+	{
+		WeaponUI->ShowHitFeedback();
+	}
 }
 

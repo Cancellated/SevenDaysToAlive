@@ -12,6 +12,7 @@
 #include "Variant_Survival/Characters/SDTAPlayer.h"
 #include "Variant_Survival/UI/SDTAPlayerHUD.h"
 #include "Variant_Survival/UI/SDTADebugUI.h"
+#include "Variant_Survival/UI/SDTAWeaponUI.h"
 #include "Widgets/Input/SVirtualJoystick.h"
 #include "SDTAPlayerController.generated.h"
 
@@ -78,6 +79,14 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "UI")
 	TObjectPtr<USDTAPlayerHUD> PlayerHUD;
 
+	/** 武器UI类 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "UI", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<USDTAWeaponUI> WeaponUIWidgetClass;
+
+	/** 武器UI对象 */
+	UPROPERTY(BlueprintReadOnly, Category = "UI")
+	TObjectPtr<USDTAWeaponUI> WeaponUI;
+
 	/** DebugUI界面类 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Debug", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<USDTADebugUI> DebugUIWidgetClass;
@@ -96,4 +105,11 @@ protected:
 public:
 	/** 获取当前控制的SDTA角色 */
 	ASDTAPlayer* GetControlledSDTAPlayer() const;
+
+	/** 更新武器计数器UI */
+	void UpdateWeaponCounterUI(int32 CurrentAmmo, int32 MagazineSize);
+
+	/** 显示击中反馈 */
+	UFUNCTION(BlueprintCallable, Category = "Weapon UI")
+	void ShowHitFeedback();
 };

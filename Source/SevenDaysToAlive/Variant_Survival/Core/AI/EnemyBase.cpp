@@ -40,11 +40,29 @@ void AEnemyBase::Tick(float DeltaTime)
 	}
 }
 
-void AEnemyBase::TakeDamage(float DamageAmount)
+float AEnemyBase::TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
+{
+	if (bIsDead) return 0.0f;
+
+	Health -= DamageAmount;
+
+	if (Health <= 0.0f)
+	{
+		Die();
+	}
+
+	return DamageAmount;
+}
+
+void AEnemyBase::ApplyDamage(float DamageAmount, const FHitResult& HitResult)
 {
 	if (bIsDead) return;
 
 	Health -= DamageAmount;
+
+	// 触发击中反馈事件
+	BP_OnHitReceived(HitResult, DamageAmount);
+	OnHitReceived.Broadcast(HitResult, DamageAmount);
 
 	if (Health <= 0.0f)
 	{

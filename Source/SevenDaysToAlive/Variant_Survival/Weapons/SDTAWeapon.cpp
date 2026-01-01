@@ -30,24 +30,6 @@ void ASDTAWeapon::BeginPlay()
 	// 初始化武器属性
 	CurrentBullets = MagazineSize;
 
-	// 查找武器所有者
-	AActor* OwnerActor = GetOwner();
-	if (OwnerActor)
-	{
-		WeaponOwner = Cast<ISDTAWeaponHolder>(OwnerActor);
-		PawnOwner = Cast<APawn>(OwnerActor);
-
-		UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAWeapon] %s - 找到所有者: %s, WeaponHolder: %s"), 
-			*GetName(), *OwnerActor->GetName(), WeaponOwner ? TEXT("有效") : TEXT("无效"));
-
-		// 监听所有者销毁事件
-		OwnerActor->OnDestroyed.AddDynamic(this, &ASDTAWeapon::OnOwnerDestroyed);
-	}
-	else
-	{
-		UE_LOG(LogSevenDaysToAlive, Warning, TEXT("[SDTAWeapon] %s - 未找到所有者"), *GetName());
-	}
-
 	// 记录动画实例类配置
 	UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAWeapon] %s - FirstPersonAnimInstanceClass: %s, ThirdPersonAnimInstanceClass: %s"), 
 		*GetName(), 
@@ -78,6 +60,30 @@ void ASDTAWeapon::EndPlay(EEndPlayReason::Type EndPlayReason)
 
 	// 清除定时器句柄
 	GetWorldTimerManager().ClearTimer(RefireTimer);
+}
+
+// 初始化武器所有者（在SetOwner之后调用）
+void ASDTAWeapon::InitializeWeaponOwner()
+{
+	UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAWeapon] %s - InitializeWeaponOwner开始"), *GetName());
+
+	// 查找武器所有者
+	AActor* OwnerActor = GetOwner();
+	if (OwnerActor)
+	{
+		WeaponOwner = Cast<ISDTAWeaponHolder>(OwnerActor);
+		PawnOwner = Cast<APawn>(OwnerActor);
+
+		UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAWeapon] %s - 找到所有者: %s, WeaponHolder: %s"), 
+			*GetName(), *OwnerActor->GetName(), WeaponOwner ? TEXT("有效") : TEXT("无效"));
+
+		// 监听所有者销毁事件
+		OwnerActor->OnDestroyed.AddDynamic(this, &ASDTAWeapon::OnOwnerDestroyed);
+	}
+	else
+	{
+		UE_LOG(LogSevenDaysToAlive, Warning, TEXT("[SDTAWeapon] %s - 未找到所有者"), *GetName());
+	}
 }
 
 // 当武器的所有者被销毁时调用
@@ -126,7 +132,7 @@ void ASDTAWeapon::ActivateWeapon()
 	if (WeaponOwner)
 	{
 		UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAWeapon] %s - 通知武器所有者激活"), *GetName());
-		WeaponOwner->OnWeaponActivated(this);
+		ISDTAWeaponHolder::Execute_OnWeaponActivated(GetOwner(), this);
 	}
 	else
 	{
@@ -164,7 +170,7 @@ void ASDTAWeapon::DeactivateWeapon()
 	// 通知武器所有者武器已停用
 	if (WeaponOwner)
 	{
-		WeaponOwner->OnWeaponDeactivated(this);
+		ISDTAWeaponHolder::Execute_OnWeaponDeactivated(GetOwner(), this);
 	}
 }
 

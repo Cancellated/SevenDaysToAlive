@@ -108,6 +108,11 @@ protected:
 	UPROPERTY()
 	USDTAPoolManager* PoolManager;
 
+	/** 命中敌人时的委托 */
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnEnemyHit);
+	UPROPERTY(BlueprintAssignable, Category="子弹")
+	FOnEnemyHit OnEnemyHit;
+
 public:	
 	// Sets default values for this actor's properties
 	ASDTAProjectiles();
@@ -146,7 +151,7 @@ protected:
 	void ExplosionCheck(const FVector& ExplosionCenter);
 
 	/** 处理子弹命中 */
-	void ProcessHit(AActor* HitActor, UPrimitiveComponent* HitComp, const FVector& HitLocation, const FVector& HitDirection);
+	void ProcessHit(AActor* HitActor, UPrimitiveComponent* HitComp, const FVector& HitLocation, const FVector& HitDirection, const FHitResult& HitResult);
 
 	/** 子弹命中的蓝图事件 */
 	UFUNCTION(BlueprintImplementableEvent, Category="子弹", meta = (DisplayName = "子弹命中"))

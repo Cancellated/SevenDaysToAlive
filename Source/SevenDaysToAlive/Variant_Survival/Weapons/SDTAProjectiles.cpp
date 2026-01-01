@@ -14,6 +14,7 @@
 #include "Engine/World.h"
 #include "TimerManager.h"
 #include "DrawDebugHelpers.h"
+#include "Variant_Survival/Core/AI/EnemyBase.h"
 
 // Sets default values
 ASDTAProjectiles::ASDTAProjectiles()
@@ -141,7 +142,7 @@ void ASDTAProjectiles::NotifyHit(class UPrimitiveComponent* MyComp, AActor* Othe
 	else
 	{
 		// 单体命中子弹。处理碰撞的演员
-		ProcessHit(Other, OtherComp, Hit.ImpactPoint, -Hit.ImpactNormal);
+		ProcessHit(Other, OtherComp, Hit.ImpactPoint, -Hit.ImpactNormal, Hit);
 	}
 
 	// 调用蓝图事件，允许在蓝图中添加额外的命中逻辑
@@ -191,7 +192,7 @@ void ASDTAProjectiles::PerformInstantHit()
 	if (bHit)
 	{
 		// 处理命中的物体
-		ProcessHit(HitResult.GetActor(), HitResult.GetComponent(), HitResult.ImpactPoint, FireDirection);
+		ProcessHit(HitResult.GetActor(), HitResult.GetComponent(), HitResult.ImpactPoint, FireDirection, HitResult);
 	}
 
 	// 调用蓝图事件，允许在蓝图中添加额外的命中逻辑
@@ -244,8 +245,16 @@ void ASDTAProjectiles::ExplosionCheck(const FVector& ExplosionCenter)
 			// 计算爆炸方向
 			const FVector& ExplosionDir = CurrentOverlap.GetActor()->GetActorLocation() - GetActorLocation();
 
+			// 创建临时的HitResult用于击中反馈
+			FHitResult TempHitResult;
+			TempHitResult.HitObjectHandle = CurrentOverlap.GetActor();
+			TempHitResult.Component = CurrentOverlap.GetComponent();
+			TempHitResult.ImpactPoint = CurrentOverlap.GetActor()->GetActorLocation();
+			TempHitResult.ImpactNormal = -ExplosionDir.GetSafeNormal();
+			TempHitResult.Location = TempHitResult.ImpactPoint;
+
 			// 推动和/或伤害重叠的演员
-			ProcessHit(CurrentOverlap.GetActor(), CurrentOverlap.GetComponent(), GetActorLocation(), ExplosionDir.GetSafeNormal());
+			ProcessHit(CurrentOverlap.GetActor(), CurrentOverlap.GetComponent(), GetActorLocation(), ExplosionDir.GetSafeNormal(), TempHitResult);
 		}
 	}
 
@@ -253,7 +262,7 @@ void ASDTAProjectiles::ExplosionCheck(const FVector& ExplosionCenter)
 }
 
 /** 处理子弹命中 */
-void ASDTAProjectiles::ProcessHit(AActor* HitActor, UPrimitiveComponent* HitComp, const FVector& HitLocation, const FVector& HitDirection)
+void ASDTAProjectiles::ProcessHit(AActor* HitActor, UPrimitiveComponent* HitComp, const FVector& HitLocation, const FVector& HitDirection, const FHitResult& HitResult)
 {
 	// 安全检查：确保命中的演员有效
 	if (!HitActor || HitActor == this)
@@ -270,13 +279,27 @@ void ASDTAProjectiles::ProcessHit(AActor* HitActor, UPrimitiveComponent* HitComp
 		// 忽略发射者，除非设置了允许伤害自己
 		if (HitCharacter != GetOwner() || bDamageOwner)
 		{
-			// 安全检查：确保伤害类型有效
-			if (HitDamageType && GetInstigator() && GetInstigator()->GetController())
+			// 检查是否命中了敌人
+			if (AEnemyBase* HitEnemy = Cast<AEnemyBase>(HitCharacter))
 			{
-				// 应用伤害
-				UGameplayStatics::ApplyDamage(HitCharacter, HitDamage, GetInstigator()->GetController(), this, HitDamageType);
-				UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAProjectiles] %s - 已对 %s 造成 %.2f 伤害"), 
-					*GetName(), *HitCharacter->GetName(), HitDamage);
+				// 调用敌人的ApplyDamage方法，传递HitResult用于击中反馈
+				HitEnemy->ApplyDamage(HitDamage, HitResult);
+				UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAProjectiles] %s - 已对敌人 %s 造成 %.2f 伤害"), 
+					*GetName(), *HitEnemy->GetName(), HitDamage);
+
+				// 触发命中敌人委托
+				OnEnemyHit.Broadcast();
+			}
+			else
+			{
+				// 安全检查：确保伤害类型有效
+				if (HitDamageType && GetInstigator() && GetInstigator()->GetController())
+				{
+					// 应用伤害到普通角色
+					UGameplayStatics::ApplyDamage(HitCharacter, HitDamage, GetInstigator()->GetController(), this, HitDamageType);
+					UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAProjectiles] %s - 已对角色 %s 造成 %.2f 伤害"), 
+						*GetName(), *HitCharacter->GetName(), HitDamage);
+				}
 			}
 		}
 	}
