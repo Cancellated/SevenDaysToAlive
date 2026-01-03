@@ -62,9 +62,8 @@ public:
 	virtual void Patrol();
 	virtual void AttackPlayer();
 
-private:
+protected:
 	// 内部状态
 	bool bIsDead;
 	bool bIsAttacking;
-
 };
