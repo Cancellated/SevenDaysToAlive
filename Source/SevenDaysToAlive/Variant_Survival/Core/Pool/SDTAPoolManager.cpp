@@ -1,5 +1,32 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
+/**
+ * SDTAPoolManager.cpp - 对象池管理器实现文件
+ * 
+ * 核心实现：
+ * 1. 对象池的初始化和配置管理
+ * 2. 多类型对象的获取和回收机制
+ * 3. 服务器端权威管理的实现
+ * 4. 对象状态的重置和生命周期管理
+ * 
+ * 实现细节：
+ * - 采用双数组设计：PooledObjects（池化对象）和ActiveObjects（活跃对象）
+ * - 使用UClass作为键的映射表，支持多类型对象管理
+ * - 自动处理Actor类型对象的生成和隐藏
+ * - 支持网络环境下的安全操作
+ * 
+ * 设计要点：
+ * - 服务器端权威：仅在服务器上启用对象池功能
+ * - 延迟初始化：仅在需要时创建对象
+ * - 自动重置：回收对象时自动重置状态
+ * - 安全检查：完善的空指针和有效性检查
+ * 
+ * 关键方法：
+ * - Initialize：初始化对象池管理器，设置世界上下文
+ * - GetObject：从池中获取对象，或在需要时创建新对象
+ * - ReturnObject：将对象回收回池中，重置状态
+ */
+
 #include "SDTAPoolManager.h"
 #include "Engine/World.h"
 #include "UObject/UObjectGlobals.h"
@@ -8,12 +35,29 @@
 #include "Components/PrimitiveComponent.h"
 #include "GameFramework/Actor.h"
 
+// 包含敌人基类头文件，用于敌人对象的特殊处理
+#include "Variant_Survival/Core/AI/EnemyBase.h"
 
+
+/**
+ * USDTAPoolManager构造函数
+ * 
+ * 功能：初始化对象池管理器的成员变量
+ * 设计要点：采用初始化列表设置World为nullptr，确保安全初始状态
+ */
 USDTAPoolManager::USDTAPoolManager()
 	: World(nullptr)
 {
 }
 
+/**
+ * 初始化对象池管理器
+ * 
+ * 功能：设置世界上下文并根据网络模式决定是否启用对象池功能
+ * 设计要点：仅在服务器模式下启用对象池，确保网络一致性
+ * 
+ * @param InWorld 游戏世界上下文指针，用于对象创建和管理
+ */
 void USDTAPoolManager::Initialize(UWorld* InWorld)
 {
 	World = InWorld;
@@ -21,13 +65,21 @@ void USDTAPoolManager::Initialize(UWorld* InWorld)
 	// 检查是否在服务器上运行
 	if (World && World->GetNetMode() != NM_DedicatedServer && World->GetNetMode() != NM_ListenServer)
 	{
-
-
 		// 如果不在服务器上，禁用对象池功能
 		World = nullptr;
 	}
 }
 
+/**
+ * 为特定类初始化对象池
+ * 
+ * 功能：创建并配置特定类型对象的对象池
+ * 设计要点：支持预创建对象、设置最大容量限制，避免重复初始化
+ * 
+ * @param ObjectClass 要池化的对象类型
+ * @param InitialSize 对象池初始大小，预创建的对象数量
+ * @param MaxSize 对象池最大大小，-1表示无限制
+ */
 void USDTAPoolManager::InitPoolForClass(TSubclassOf<UObject> ObjectClass, int32 InitialSize, int32 MaxSize)
 {
 	if (!World || !ObjectClass || InitialSize < 0)
@@ -60,6 +112,15 @@ void USDTAPoolManager::InitPoolForClass(TSubclassOf<UObject> ObjectClass, int32 
 	ObjectPools.Add(Class, PoolConfig);
 }
 
+/**
+ * 从对象池中获取对象
+ * 
+ * 功能：优先从池中获取对象，如池为空且未达最大容量则创建新对象
+ * 设计要点：自动管理对象状态、处理Actor类型特殊逻辑
+ * 
+ * @param ObjectClass 要获取的对象类型
+ * @return 返回获取或创建的对象指针，如失败则返回nullptr
+ */
 UObject* USDTAPoolManager::GetObject(TSubclassOf<UObject> ObjectClass)
 {
 	if (!ObjectClass || !World)
@@ -121,6 +182,15 @@ UObject* USDTAPoolManager::GetObject(TSubclassOf<UObject> ObjectClass)
 	return Object;
 }
 
+/**
+ * 将对象回收到对象池中
+ * 
+ * 功能：将活跃对象从世界中移除并重置状态，放回池中待复用
+ * 设计要点：完善的安全检查、自动重置对象状态、优化渲染和物理性能
+ * 
+ * @param Object 要回收的对象指针
+ * @return 回收成功返回true，失败返回false
+ */
 bool USDTAPoolManager::ReturnObject(UObject* Object)
 {
 	if (!World || !Object)
@@ -170,6 +240,14 @@ bool USDTAPoolManager::ReturnObject(UObject* Object)
 	return true;
 }
 
+/**
+ * 清除特定类型的对象池
+ * 
+ * 功能：销毁指定类型的所有池化对象和活跃对象，并移除对象池配置
+ * 设计要点：完整的资源清理，避免内存泄漏
+ * 
+ * @param ObjectClass 要清除的对象池类型
+ */
 void USDTAPoolManager::ClearPool(TSubclassOf<UObject> ObjectClass)
 {
 	if (!ObjectClass)
@@ -211,6 +289,12 @@ void USDTAPoolManager::ClearPool(TSubclassOf<UObject> ObjectClass)
 	ObjectPools.Remove(Class);
 }
 
+/**
+ * 清除所有对象池
+ * 
+ * 功能：销毁所有类型的对象池及其包含的所有对象
+ * 设计要点：批量清理资源，适用于游戏重置或卸载场景
+ */
 void USDTAPoolManager::ClearAllPools()
 {
 	// 遍历所有对象池
@@ -243,6 +327,16 @@ void USDTAPoolManager::ClearAllPools()
 	ActiveObjectToClassMap.Empty();
 }
 
+/**
+ * 获取对象池信息
+ * 
+ * 功能：返回指定类型对象池的池化对象数和活跃对象数
+ * 设计要点：使用输出参数返回信息，不修改对象池状态
+ * 
+ * @param ObjectClass 要查询的对象池类型
+ * @param OutPooledCount 输出参数：池化对象数量
+ * @param OutActiveCount 输出参数：活跃对象数量
+ */
 void USDTAPoolManager::GetPoolInfo(TSubclassOf<UObject> ObjectClass, int32& OutPooledCount, int32& OutActiveCount) const
 {
 	OutPooledCount = 0;
@@ -264,6 +358,15 @@ void USDTAPoolManager::GetPoolInfo(TSubclassOf<UObject> ObjectClass, int32& OutP
 	}
 }
 
+/**
+ * 创建新对象
+ * 
+ * 功能：根据对象类型创建新实例，支持Actor和普通UObject类型
+ * 设计要点：区别处理不同类型对象，设置合适的网络和渲染属性
+ * 
+ * @param ObjectClass 要创建的对象类型
+ * @return 返回创建的对象指针，如失败则返回nullptr
+ */
 UObject* USDTAPoolManager::CreateNewObject(TSubclassOf<UObject> ObjectClass)
 {
 	if (!ObjectClass || !World)
@@ -308,6 +411,14 @@ UObject* USDTAPoolManager::CreateNewObject(TSubclassOf<UObject> ObjectClass)
 	return NewObject;
 }
 
+/**
+ * 重置对象状态
+ * 
+ * 功能：恢复对象的初始状态，为复用做准备
+ * 设计要点：支持敌人对象的特殊处理，重置物理和运动组件
+ * 
+ * @param Object 要重置的对象指针
+ */
 void USDTAPoolManager::ResetObject(UObject* Object)
 {
 	if (!World || !Object)
@@ -320,6 +431,16 @@ void USDTAPoolManager::ResetObject(UObject* Object)
 	AActor* Actor = Cast<AActor>(Object);
 	if (Actor)
 	{
+		// 检查是否是EnemyBase类型
+		AEnemyBase* Enemy = Cast<AEnemyBase>(Actor);
+		if (Enemy)
+		{
+			// 调用EnemyBase的Reset方法，确保敌人状态完全重置
+			Enemy->Reset();
+			return;
+		}
+
+		// 通用Actor重置
 		Actor->SetActorLocation(FVector::ZeroVector);
 		Actor->SetActorRotation(FRotator::ZeroRotator);
 		Actor->SetActorScale3D(FVector::OneVector);

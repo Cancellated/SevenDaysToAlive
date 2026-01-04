@@ -1,12 +1,36 @@
 // 七日求生游戏模式实现
 // 主机权威制的昼夜循环生存游戏
 
+/**
+ * SDTAGameMode.cpp - 游戏模式实现文件
+ * 
+ * 核心功能：
+ * 1. 管理游戏的整体流程和状态
+ * 2. 实现昼夜循环系统
+ * 3. 管理敌人的生成和回收
+ * 4. 处理UI更新和事件广播
+ * 5. 管理对象池系统
+ * 
+ * 设计要点：
+ * - 采用主机权威制设计，确保游戏逻辑的一致性
+ * - 集成对象池管理器，实现敌人等游戏对象的高效复用
+ * - 提供安全的访问接口，避免直接访问私有成员变量
+ * 
+ * 使用说明：
+ * - 作为游戏的核心控制器，协调各个系统的工作
+ * - 通过GetPoolManager()方法提供对象池访问接口
+ * - 管理游戏内的时间流逝和昼夜变化
+ */
+
 #include "Variant_Survival/Core/Game/SDTAGameMode.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
 #include "GameFramework/PlayerState.h"
 #include "GameFramework/PlayerController.h"
+
+// 包含对象池管理器头文件
+#include "Variant_Survival/Core/Pool/SDTAPoolManager.h"
 
 #pragma region 构造函数和基础方法
 ASDTAGameMode::ASDTAGameMode()
@@ -36,6 +60,13 @@ ASDTAGameMode::ASDTAGameMode()
 void ASDTAGameMode::BeginPlay()
 {
 	Super::BeginPlay();
+	
+	// 初始化对象池管理器
+	PoolManager = NewObject<USDTAPoolManager>(this, USDTAPoolManager::StaticClass());
+	if (PoolManager)
+	{
+		PoolManager->Initialize(GetWorld());
+	}
 	
 	// 游戏开始逻辑
 	StartGame();
@@ -192,6 +223,24 @@ void ASDTAGameMode::ServerApplyUpgrade_Implementation(class APlayerState* Player
 #pragma endregion
 
 #pragma region 游戏状态管理 - 方法声明
+/**
+ * 实现GetPoolManager方法
+ * 
+ * 功能：提供对私有成员变量PoolManager的安全访问接口
+ * 实现细节：直接返回内部对象池管理器实例的指针
+ * 
+ * @return 返回对象池管理器实例，如果未初始化则返回nullptr
+ * 
+ * 设计说明：
+ * - 采用只读访问（const），确保外部无法修改内部对象池管理器
+ * - 实现了封装原则，避免直接访问私有成员变量
+ * - 支持蓝图调用，便于在蓝图中使用对象池功能
+ */
+USDTAPoolManager* ASDTAGameMode::GetPoolManager() const
+{
+	return PoolManager;
+}
+
 void ASDTAGameMode::StartGame()
 {
 	// TODO: 实现游戏开始逻辑

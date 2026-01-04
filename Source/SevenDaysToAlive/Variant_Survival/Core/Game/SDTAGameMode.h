@@ -9,6 +9,17 @@
 
 /**
  * 七日求生游戏模式类
+ * 
+ * 核心功能：
+ * 1. 管理游戏的整体流程和状态
+ * 2. 控制昼夜循环系统
+ * 3. 管理敌人的生成和对象池
+ * 4. 处理UI更新和事件广播
+ * 
+ * 使用说明：
+ * - 作为游戏的核心控制器，负责协调各个系统
+ * - 提供对对象池管理器的访问接口
+ * - 管理游戏内的时间流逝和状态变化
  */
 UCLASS()
 class SEVENDAYSTOALIVE_API ASDTAGameMode : public AGameMode
@@ -152,6 +163,17 @@ public:
 	// 存档系统（预留）
 	void SaveGameProgress();
 	void LoadGameProgress();
+	
+	/**
+	 * 获取对象池管理器实例
+	 * 
+	 * 功能：提供对游戏模式内部对象池管理器的安全访问接口
+	 * 用途：用于获取和操作对象池，实现敌人等游戏对象的高效回收和复用
+	 * 
+	 * @return 返回对象池管理器实例，如果未初始化则返回nullptr
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Game Systems")
+	USDTAPoolManager* GetPoolManager() const;
 #pragma endregion
 
 #pragma region UI与事件系统
@@ -162,6 +184,10 @@ public:
 #pragma endregion
 
 private:
+	// 对象池管理器
+	UPROPERTY()
+	class USDTAPoolManager* PoolManager;
+	
 	// 内部计时器
 	FTimerHandle EnemySpawnTimer;
 	FTimerHandle DayNightTimer;
