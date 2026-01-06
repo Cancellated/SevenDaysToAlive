@@ -751,8 +751,33 @@ void ASDTAPlayer::PlayFiringMontage(UAnimMontage* Montage)
 
 	if (!Montage) return;
 	
-	// 播放射击动画
-	GetMesh()->GetAnimInstance()->Montage_Play(Montage);
+	// 播放射击动画 - 在第一人称网格上播放，因为武器是第一人称视角的
+	USkeletalMeshComponent* FirstPersonMeshComp = GetFirstPersonMesh();
+	if (FirstPersonMeshComp)
+	{
+		UAnimInstance* AnimInstance = FirstPersonMeshComp->GetAnimInstance();
+		if (AnimInstance)
+		{
+			// 设置动画播放参数并播放
+			float PlayRate = 1.0f;
+			float BlendInTime = 0.1f;
+			float BlendOutTime = 0.1f;
+			
+			// 停止当前可能播放的其他蒙太奇
+			AnimInstance->Montage_Stop(BlendOutTime);
+			
+			// 播放新的蒙太奇
+			AnimInstance->Montage_Play(Montage, PlayRate, EMontagePlayReturnType::Duration, BlendInTime);
+		}
+		else
+		{
+			UE_LOG(LogSevenDaysToAlive, Warning, TEXT("[SDTAWeaponHolder] %s - 第一人称网格的动画实例无效"), *GetName());
+		}
+	}
+	else
+	{
+		UE_LOG(LogSevenDaysToAlive, Warning, TEXT("[SDTAWeaponHolder] %s - 第一人称网格无效"), *GetName());
+	}
 }
 
 /** 应用武器后坐力到角色 */
