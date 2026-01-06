@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Variant_Survival/Weapons/SDTAWeapon.h"
+#include "Variant_Survival/Components/WeaponComponent.h"
 #include "SevenDaysToAlive.h"
 
 // 设置默认值
@@ -71,7 +72,43 @@ void ASDTAWeapon::InitializeWeaponOwner()
 	AActor* OwnerActor = GetOwner();
 	if (OwnerActor)
 	{
+		// 首先尝试直接转换所有者为ISDTAWeaponHolder
 		WeaponOwner = Cast<ISDTAWeaponHolder>(OwnerActor);
+		
+		// 如果所有者不是ISDTAWeaponHolder，尝试从所有者的组件中查找
+		if (!WeaponOwner)
+		{
+			// 直接尝试获取WeaponComponent
+			UWeaponComponent* WeaponComp = OwnerActor->FindComponentByClass<UWeaponComponent>();
+			if (WeaponComp)
+			{
+				WeaponOwner = Cast<ISDTAWeaponHolder>(WeaponComp);
+				if (WeaponOwner)
+				{
+					UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAWeapon] %s - 找到WeaponComponent: %s"), *GetName(), *WeaponComp->GetName());
+				}
+			}
+			else
+			{
+				// 如果没有找到WeaponComponent，遍历所有组件
+				const TSet<UActorComponent*>& AllComponents = OwnerActor->GetComponents();
+				for (UActorComponent* Component : AllComponents)
+				{
+					if (Component)
+					{
+						// 尝试将组件转换为ISDTAWeaponHolder
+						ISDTAWeaponHolder* PotentialHolder = Cast<ISDTAWeaponHolder>(Component);
+						if (PotentialHolder)
+						{
+							WeaponOwner = PotentialHolder;
+							UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAWeapon] %s - 从组件中找到WeaponHolder: %s"), *GetName(), *Component->GetName());
+							break;
+						}
+					}
+				}
+			}
+		}
+		
 		PawnOwner = Cast<APawn>(OwnerActor);
 
 		UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAWeapon] %s - 找到所有者: %s, WeaponHolder: %s"), 
@@ -132,7 +169,15 @@ void ASDTAWeapon::ActivateWeapon()
 	if (WeaponOwner)
 	{
 		UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAWeapon] %s - 通知武器所有者激活"), *GetName());
-		ISDTAWeaponHolder::Execute_OnWeaponActivated(GetOwner(), this);
+		// 由于WeaponOwner可能是组件，使用它作为接口调用的目标
+		if (UObject* WeaponOwnerObj = Cast<UObject>(WeaponOwner))
+		{
+			ISDTAWeaponHolder::Execute_OnWeaponActivated(WeaponOwnerObj, this);
+		}
+		else
+		{
+			UE_LOG(LogSevenDaysToAlive, Error, TEXT("[SDTAWeapon] %s - WeaponOwner无法转换为UObject"), *GetName());
+		}
 	}
 	else
 	{
@@ -170,7 +215,15 @@ void ASDTAWeapon::DeactivateWeapon()
 	// 通知武器所有者武器已停用
 	if (WeaponOwner)
 	{
-		ISDTAWeaponHolder::Execute_OnWeaponDeactivated(GetOwner(), this);
+		// 由于WeaponOwner可能是组件，使用它作为接口调用的目标
+		if (UObject* WeaponOwnerObj = Cast<UObject>(WeaponOwner))
+		{
+			ISDTAWeaponHolder::Execute_OnWeaponDeactivated(WeaponOwnerObj, this);
+		}
+		else
+		{
+			UE_LOG(LogSevenDaysToAlive, Error, TEXT("[SDTAWeapon] %s - WeaponOwner无法转换为UObject"), *GetName());
+		}
 	}
 }
 
