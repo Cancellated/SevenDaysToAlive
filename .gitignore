@@ -91,3 +91,8 @@ DerivedDataCache/*
 
 # Ignore .trae folder
 .trae/
+.vscode/c_cpp_properties.json
+.vscode/compileCommands_Default.json
+.vscode/compileCommands_Default/SevenDaysToAlive.1.rsp
+.vscode/compileCommands_SevenDaysToAlive.json
+.vscode/compileCommands_SevenDaysToAlive/SevenDaysToAlive.1.rsp

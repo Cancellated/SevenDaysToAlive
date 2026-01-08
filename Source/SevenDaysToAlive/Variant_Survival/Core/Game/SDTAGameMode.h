@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/GameMode.h"
 #include "Variant_Survival/Enemies/AI/EnemyBase.h"
+#include "Variant_Survival/Core/Game/DayNight/SDTADayNightManager.h"
 #include "SDTAGameMode.generated.h"
 
 /**
@@ -36,55 +37,66 @@ protected:
 
 #pragma region 昼夜循环系统
 public:
-	// 游戏时间管理
+	// 昼夜管理器
+	UPROPERTY(BlueprintReadOnly, Category = "Day Night System")
+	USDTADayNightManager* DayNightManager; // 昼夜管理器实例
+	
+	// 获取昼夜管理器实例
+	UFUNCTION(BlueprintCallable, Category = "Day Night System")
+	USDTADayNightManager* GetDayNightManager() const;
+	
+	// 昼夜状态获取方法（保持向后兼容）
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Game State")
+	bool bIsNight; // 是否为夜晚阶段
+	
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Game State")
 	float GameTime; // 游戏内时间（秒）
 	
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Game State")
 	int32 CurrentDay; // 当前天数（1-7）
 	
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Game State")
-	bool bIsNight; // 是否为夜晚阶段
+	// 昼夜管理器事件回调
+	UFUNCTION()
+	void OnDayNightStateChanged(bool bIsNowNight);
 	
-	// 时间配置
-	UPROPERTY(EditDefaultsOnly, Category = "Game Config")
+	UFUNCTION()
+	void OnTimeUpdated(float RemainingTime, float TimePercent);
+
+	// 昼夜系统配置（直接暴露到GameMode以便在蓝图中配置）
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Day Night System|Time Configuration")
 	float DayDuration; // 白天持续时间（秒）
 	
-	UPROPERTY(EditDefaultsOnly, Category = "Game Config")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Day Night System|Time Configuration")
 	float NightDuration; // 夜晚持续时间（秒）
 	
-	// 昼夜切换事件
-	UFUNCTION(BlueprintCallable, Category = "Game State")
-	void StartNightPhase();
-	
-	UFUNCTION(BlueprintCallable, Category = "Game State")
-	void StartDayPhase();
-	
-	// 时间更新逻辑
-	void UpdateGameTime(float DeltaTime);
-	void CheckDayNightTransition();
-	
-	// 渐变系统
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Transition")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Day Night System|Transition")
 	float TransitionDuration; // 昼夜过渡持续时间（秒）
 	
-	UPROPERTY(BlueprintReadOnly, Category = "Transition")
-	bool bIsTransitioning; // 是否正在过渡
+	// 光源配置
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Day Night System|Light Configuration")
+	float DayLightIntensity; // 白天光源亮度
 	
-private:
-	float TransitionProgress; // 过渡进度（0-1）
-	bool bTransitionToNight; // 是否过渡到夜晚
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Day Night System|Light Configuration")
+	float NightLightIntensity; // 夜晚光源亮度
 	
-	/**
-	 * 应用过渡效果
-	 * 
-	 * 功能：在昼夜过渡过程中，平滑调整光源亮度、颜色和大气颜色
-	 * 用途：在Tick中调用，实现平滑的昼夜过渡效果
-	 * 
-	 * @param Progress 过渡进度（0-1）
-	 * @param bToNight 是否过渡到夜晚
-	 */
-	void ApplyTransitionEffects(float Progress, bool bToNight);
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Day Night System|Light Configuration")
+	FLinearColor DayLightColor; // 白天光源颜色
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Day Night System|Light Configuration")
+	FLinearColor NightLightColor; // 夜晚光源颜色
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Day Night System|Light Configuration")
+	FName LightTag; // 光源标签
+	
+	// 大气配置
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Day Night System|Atmosphere Configuration")
+	FLinearColor DayAtmosphereColor; // 白天大气瑞利散射颜色
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Day Night System|Atmosphere Configuration")
+	FLinearColor NightAtmosphereColor; // 夜晚大气瑞利散射颜色
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Day Night System|Atmosphere Configuration")
+	FName AtmosphereTag; // 大气标签
 #pragma endregion
 
 #pragma region 敌人生成系统
@@ -202,60 +214,7 @@ public:
 	void BroadcastGameState();
 #pragma endregion
 
-#pragma region 光源管理系统
-public:
-	// 光源配置
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Light Management")
-	float DayLightIntensity; // 白天光源亮度
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Light Management")
-	float NightLightIntensity; // 夜晚光源亮度
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Light Management")
-	FLinearColor DayLightColor; // 白天光源颜色
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Light Management")
-	FLinearColor NightLightColor; // 夜晚光源颜色
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Light Management")
-	FName LightTag; // 光源标签
-
-	// 大气配置
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Light Management")
-	FLinearColor DayAtmosphereColor; // 白天大气瑞利散射颜色
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Light Management")
-	FLinearColor NightAtmosphereColor; // 夜晚大气瑞利散射颜色
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Light Management")
-	FName AtmosphereTag; // 大气标签
-
-	/**
-	 * 获取世界中的光源列表
-	 * 
-	 * 功能：遍历世界中的所有光源，可选择按标签筛选
-	 * 用途：用于获取需要调整亮度的光源
-	 * 
-	 * @param OptionalTag 可选的光源标签筛选
-	 * @return 返回符合条件的光源列表
-	 */
-	UFUNCTION(BlueprintCallable, Category = "Light Management")
-	TArray<class ULightComponent*> GetWorldLights(const FName& OptionalTag = NAME_None);
-	
-	/**
-	 * 设置光源亮度和颜色
-	 * 
-	 * 功能：根据昼夜状态调整光源的亮度和颜色
-	 * 用途：在昼夜切换时调用，实现场景光照的变化
-	 * 
-	 * @param bNight 是否为夜晚
-	 */
-	UFUNCTION(BlueprintCallable, Category = "Light Management")
-	void SetLightIntensityBasedOnTime(bool bNight);
-
-	UFUNCTION(BlueprintCallable, Category = "Light Management")
-	void SetAtmosphereColorBasedOnTime(bool bNight);
-#pragma endregion
 
 private:
 	// 对象池管理器
@@ -268,4 +227,7 @@ private:
 	
 	// 敌人列表
 	TArray<class AEnemyBase*> ActiveEnemies;
+	
+	// 日志输出控制
+	float LastLogTime; // 上次输出游戏状态日志的时间
 };

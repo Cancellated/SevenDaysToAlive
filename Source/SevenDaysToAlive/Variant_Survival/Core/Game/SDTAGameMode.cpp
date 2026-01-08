@@ -37,13 +37,9 @@
 #include "Variant_Survival/UI/SDTAPlayerHUD.h"
 #include "Variant_Survival/Controller/SDTAPlayerController.h"
 #include "Blueprint/UserWidget.h"
-#include "Components/LightComponent.h"
-#include "Components/PointLightComponent.h"
-#include "Components/DirectionalLightComponent.h"
-#include "Components/SpotLightComponent.h"
-// 包含天空大气组件头文件
-#include "Components/SkyAtmosphereComponent.h"
-#include "Components/ExponentialHeightFogComponent.h"
+
+// 包含昼夜管理器头文件
+#include "Variant_Survival/Core/Game/DayNight/SDTADayNightManager.h"
 
 #pragma region 构造函数和基础方法
 ASDTAGameMode::ASDTAGameMode()
@@ -52,9 +48,6 @@ ASDTAGameMode::ASDTAGameMode()
 	GameTime = 0.0f;
 	CurrentDay = 1;
 	bIsNight = false;
-	
-	DayDuration = 120.0f; // 2分钟白天（用于升级准备）
-	NightDuration = 300.0f; // 5分钟夜晚（用于战斗）
 	
 	CurrentEnemyCount = 0;
 	MaxEnemyCount = 20;
@@ -67,24 +60,26 @@ ASDTAGameMode::ASDTAGameMode()
 	bGameStarted = false;
 	bGameOver = false;
 	bVictory = false;
-	
-	// 初始化光源配置
-	DayLightIntensity = 1.0f;
-	NightLightIntensity = 0.3f;
-	DayLightColor = FLinearColor::White;
-	NightLightColor = FLinearColor(0.7f, 0.7f, 1.0f); // 夜晚偏蓝色
-	LightTag = FName("WorldLight");
 
-	// 初始化大气配置
-	DayAtmosphereColor = FLinearColor(0.5f, 0.7f, 1.0f); // 白天蓝色天空
-	NightAtmosphereColor = FLinearColor(0.1f, 0.1f, 0.3f); // 夜晚深蓝色天空
+	// 昼夜系统默认配置
+	DayDuration = 120.0f; // 白天 2 分钟
+	NightDuration = 300.0f; // 夜晚 5 分钟
+	TransitionDuration = 5.0f; // 5 秒过渡
+	
+	// 光源默认配置
+	DayLightIntensity = 3.0f;
+	NightLightIntensity = 0.5f;
+	DayLightColor = FLinearColor(1.0f, 0.95f, 0.9f); // 白天暖白色
+	NightLightColor = FLinearColor(0.7f, 0.8f, 1.0f); // 夜晚蓝白色
+	LightTag = FName("WorldLight");
+	
+	// 大气默认配置
+	DayAtmosphereColor = FLinearColor(0.5f, 0.7f, 1.0f); // 白天蓝色
+	NightAtmosphereColor = FLinearColor(0.1f, 0.1f, 0.3f); // 夜晚深蓝色
 	AtmosphereTag = FName("WorldAtmosphere");
 	
-	// 初始化渐变系统
-	TransitionDuration = 5.0f; // 默认5秒过渡时间
-	bIsTransitioning = false;
-	TransitionProgress = 0.0f;
-	bTransitionToNight = false;
+	// 日志输出控制
+	LastLogTime = 0.0f;
 }
 
 void ASDTAGameMode::BeginPlay()
@@ -98,6 +93,39 @@ void ASDTAGameMode::BeginPlay()
 		PoolManager->Initialize(GetWorld());
 	}
 	
+	// 初始化昼夜管理器
+	if (!DayNightManager)
+	{
+		DayNightManager = NewObject<USDTADayNightManager>(this, USDTADayNightManager::StaticClass());
+	}
+	
+	if (DayNightManager)
+	{
+		// 将GameMode中配置的属性传递给DayNightManager
+		DayNightManager->DayDuration = DayDuration;
+		DayNightManager->NightDuration = NightDuration;
+		DayNightManager->TransitionDuration = TransitionDuration;
+		
+		// 光源配置
+		DayNightManager->DayLightIntensity = DayLightIntensity;
+		DayNightManager->NightLightIntensity = NightLightIntensity;
+		DayNightManager->DayLightColor = DayLightColor;
+		DayNightManager->NightLightColor = NightLightColor;
+		DayNightManager->LightTag = LightTag;
+		
+		// 大气配置
+		DayNightManager->DayAtmosphereColor = DayAtmosphereColor;
+		DayNightManager->NightAtmosphereColor = NightAtmosphereColor;
+		DayNightManager->AtmosphereTag = AtmosphereTag;
+		
+		// 初始化昼夜管理器
+		DayNightManager->Initialize(GetWorld());
+		
+		// 绑定昼夜管理器事件
+		DayNightManager->OnDayNightStateChanged.AddDynamic(this, &ASDTAGameMode::OnDayNightStateChanged);
+		DayNightManager->OnTimeUpdated.AddDynamic(this, &ASDTAGameMode::OnTimeUpdated);
+	}
+	
 	// 游戏开始逻辑
 	StartGame();
 }
@@ -108,50 +136,18 @@ void ASDTAGameMode::Tick(float DeltaTime)
 	
 	if (bGameStarted && !bGameOver)
 	{
-		// 检查是否正在过渡
-		if (bIsTransitioning)
+		// 调用昼夜管理器的 Tick 方法
+		if (DayNightManager)
 		{
-			// 更新过渡进度
-			TransitionProgress += DeltaTime / TransitionDuration;
-			TransitionProgress = FMath::Clamp(TransitionProgress, 0.0f, 1.0f);
-			
-			// 应用过渡效果
-			ApplyTransitionEffects(TransitionProgress, bTransitionToNight);
-			
-			// 检查过渡是否完成
-			if (TransitionProgress >= 1.0f)
-			{
-				bIsTransitioning = false;
-				TransitionProgress = 0.0f;
-				
-				// 过渡完成后设置最终状态
-				if (bTransitionToNight)
-				{
-					SetLightIntensityBasedOnTime(true);
-					SetAtmosphereColorBasedOnTime(true);
-				}
-				else
-				{
-					SetLightIntensityBasedOnTime(false);
-					SetAtmosphereColorBasedOnTime(false);
-				}
-			}
+			DayNightManager->Tick(DeltaTime);
 		}
-		else
-		{
-			// 更新游戏时间
-			UpdateGameTime(DeltaTime);
-			
-			// 检查昼夜切换
-			CheckDayNightTransition();
-			
-			// 检查游戏结束条件
-			CheckWinCondition();
-			CheckLoseCondition();
-			
-			// 更新UI
-			UpdateGameUI();
-		}
+		
+		// 检查游戏结束条件
+		CheckWinCondition();
+		CheckLoseCondition();
+		
+		// 更新UI
+		UpdateGameUI();
 	}
 }
 
@@ -176,320 +172,10 @@ void ASDTAGameMode::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 }
 #pragma endregion
 
-#pragma region 光源管理系统 - 方法实现
-/**
- * 获取世界中的光源列表
- * 
- * 功能：遍历世界中的所有光源，可选择按标签筛选
- * 实现细节：
- * - 获取世界中的所有Actor
- * - 遍历每个Actor的所有组件
- * - 筛选出LightComponent类型的组件
- * - 如果指定了标签，则只返回带有该标签的光源
- * 
- * @param OptionalTag 可选的光源标签筛选
- * @return 返回符合条件的光源列表
- */
-TArray<class ULightComponent*> ASDTAGameMode::GetWorldLights(const FName& OptionalTag)
-{
-	TArray<class ULightComponent*> LightComponents;
-	
-	if (UWorld* World = GetWorld())
-	{
-		// 获取世界中的所有Actor
-		TArray<AActor*> AllActors;
-		UGameplayStatics::GetAllActorsOfClass(World, AActor::StaticClass(), AllActors);
-		
-		// 遍历每个Actor
-		for (AActor* Actor : AllActors)
-		{
-			if (!Actor) continue;
-			
-			// 检查是否需要按标签筛选
-			if (OptionalTag != NAME_None && !Actor->ActorHasTag(OptionalTag))
-			{
-				continue;
-			}
-			
-			// 获取Actor的所有组件
-			TArray<UActorComponent*> Components;
-			Actor->GetComponents(ULightComponent::StaticClass(), Components);
-			
-			// 将符合条件的光源组件添加到列表中
-			for (UActorComponent* Component : Components)
-			{
-				if (ULightComponent* LightComp = Cast<ULightComponent>(Component))
-				{
-					LightComponents.Add(LightComp);
-				}
-			}
-		}
-	}
-	
-	return LightComponents;
-}
-
-/**
- * 设置光源亮度和颜色
- * 
- * 功能：根据昼夜状态调整光源的亮度和颜色
- * 实现细节：
- * - 使用LightTag获取世界中的光源
- * - 根据昼夜状态设置不同的亮度和颜色
- * - 记录调整结果
- * 
- * @param bNight 是否为夜晚
- */
-void ASDTAGameMode::SetLightIntensityBasedOnTime(bool bNight)
-{
-	// 使用LightTag获取世界中的光源
-	TArray<class ULightComponent*> Lights = GetWorldLights(LightTag);
-	
-	// 根据昼夜状态确定目标亮度和颜色
-	float TargetIntensity = bNight ? NightLightIntensity : DayLightIntensity;
-	FLinearColor TargetColor = bNight ? NightLightColor : DayLightColor;
-	
-	// 遍历并设置每个光源的亮度和颜色
-	for (ULightComponent* Light : Lights)
-	{
-		if (Light)
-		{
-			// 设置光源的亮度
-			Light->SetIntensity(TargetIntensity);
-			// 设置光源的颜色
-			Light->SetLightColor(TargetColor);
-		}
-	}
-	
-	// 输出调试信息
-	UE_LOG(LogTemp, Log, TEXT("光源亮度和颜色已调整：昼夜=%d, 亮度值=%.2f, 影响光源数量=%d"), bNight, TargetIntensity, Lights.Num());
-}
-
-/**
- * 设置大气瑞利散射颜色
- * 
- * 功能：根据昼夜状态调整大气的瑞利散射颜色
- * 实现细节：
- * - 使用AtmosphereTag获取世界中的大气组件
- * - 根据昼夜状态设置不同的瑞利散射颜色
- * - 记录调整结果
- * 
- * @param bNight 是否为夜晚
- */
-void ASDTAGameMode::SetAtmosphereColorBasedOnTime(bool bNight)
-{
-	if (UWorld* World = GetWorld())
-	{
-		// 获取世界中带有AtmosphereTag标签的Actor
-		TArray<AActor*> AtmosphereActors;
-		UGameplayStatics::GetAllActorsWithTag(World, AtmosphereTag, AtmosphereActors);
-		
-		// 根据昼夜状态确定目标颜色
-		FLinearColor TargetColor = bNight ? NightAtmosphereColor : DayAtmosphereColor;
-		
-		// 遍历并设置每个大气组件的瑞利散射颜色
-		for (AActor* Actor : AtmosphereActors)
-		{
-			if (!Actor) continue;
-			
-			// 尝试获取天空大气组件
-			TArray<UActorComponent*> Components;
-			Actor->GetComponents(USkyAtmosphereComponent::StaticClass(), Components);
-			
-			for (UActorComponent* Component : Components)
-			{
-				if (USkyAtmosphereComponent* AtmosphereComp = Cast<USkyAtmosphereComponent>(Component))
-				{
-					// 设置瑞利散射颜色
-					// 在UE5中，瑞利散射颜色通过RayleighScattering属性设置
-					AtmosphereComp->RayleighScattering = TargetColor;
-					
-					// 输出调试信息
-					UE_LOG(LogTemp, Log, TEXT("已设置天空大气组件的瑞利散射：昼夜=%d, 颜色=%s"), bNight, *TargetColor.ToString());
-				}
-			}
-		}
-		
-		// 输出调试信息
-		UE_LOG(LogTemp, Log, TEXT("大气颜色已调整：昼夜=%d, 影响大气数量=%d"), bNight, AtmosphereActors.Num());
-	}
-}
-
-/**
- * 应用过渡效果
- * 
- * 功能：在昼夜过渡期间应用平滑的颜色和亮度变化
- * 实现细节：
- * - 根据过渡进度计算当前的亮度和颜色值
- * - 应用到光源和大气组件
- * - 使用线性插值实现平滑过渡
- * 
- * @param Progress 过渡进度（0-1）
- * @param bToNight 是否过渡到夜晚
- */
-void ASDTAGameMode::ApplyTransitionEffects(float Progress, bool bToNight)
-{
-	if (UWorld* World = GetWorld())
-	{
-		// 计算过渡的亮度和颜色值
-		float StartIntensity = bToNight ? DayLightIntensity : NightLightIntensity;
-		float EndIntensity = bToNight ? NightLightIntensity : DayLightIntensity;
-		FLinearColor StartColor = bToNight ? DayLightColor : NightLightColor;
-		FLinearColor EndColor = bToNight ? NightLightColor : DayLightColor;
-		FLinearColor StartAtmosphereColor = bToNight ? DayAtmosphereColor : NightAtmosphereColor;
-		FLinearColor EndAtmosphereColor = bToNight ? NightAtmosphereColor : DayAtmosphereColor;
-		
-		// 线性插值计算当前值
-		float CurrentIntensity = FMath::Lerp(StartIntensity, EndIntensity, Progress);
-		FLinearColor CurrentLightColor = FLinearColor::LerpUsingHSV(StartColor, EndColor, Progress);
-		FLinearColor CurrentAtmosphereColor = FLinearColor::LerpUsingHSV(StartAtmosphereColor, EndAtmosphereColor, Progress);
-		
-		// 应用光源过渡效果
-		TArray<class ULightComponent*> Lights = GetWorldLights(LightTag);
-		for (ULightComponent* Light : Lights)
-		{
-			if (Light)
-			{
-				Light->SetIntensity(CurrentIntensity);
-				Light->SetLightColor(CurrentLightColor);
-			}
-		}
-		
-		// 应用大气过渡效果
-		TArray<AActor*> AtmosphereActors;
-		UGameplayStatics::GetAllActorsWithTag(World, AtmosphereTag, AtmosphereActors);
-		
-		for (AActor* Actor : AtmosphereActors)
-		{
-			if (!Actor) continue;
-			
-			TArray<UActorComponent*> Components;
-			Actor->GetComponents(USkyAtmosphereComponent::StaticClass(), Components);
-			
-			for (UActorComponent* Component : Components)
-			{
-				if (USkyAtmosphereComponent* AtmosphereComp = Cast<USkyAtmosphereComponent>(Component))
-				{
-					AtmosphereComp->RayleighScattering = CurrentAtmosphereColor;
-				}
-			}
-		}
-	}
-}
+#pragma region 昼夜管理器事件回调
 #pragma endregion
 
 
-
-#pragma region 昼夜循环系统 - 方法实现
-/**
- * 更新游戏时间
- * 
- * 功能：根据DeltaTime更新游戏内时间
- * 实现细节：简单累加DeltaTime到GameTime变量
- * 
- * @param DeltaTime 帧间隔时间（秒）
- */
-void ASDTAGameMode::UpdateGameTime(float DeltaTime)
-{
-	GameTime += DeltaTime;
-}
-
-/**
- * 检查昼夜切换
- * 
- * 功能：根据当前游戏时间判断是否需要进行昼夜切换
- * 实现细节：
- * - 白天：检查是否达到白天持续时间
- * - 夜晚：检查是否达到夜晚持续时间
- * - 达到时间后调用相应的阶段开始方法
- */
-void ASDTAGameMode::CheckDayNightTransition()
-{
-	if (!bIsNight)
-	{
-		// 白天阶段：检查是否达到白天持续时间
-		if (GameTime >= DayDuration)
-		{
-			// 重置游戏时间并开始夜晚阶段
-			GameTime = 0.0f;
-			StartNightPhase();
-		}
-	}
-	else
-	{
-		// 夜晚阶段：检查是否达到夜晚持续时间
-		if (GameTime >= NightDuration)
-		{
-			// 重置游戏时间并开始白天阶段
-			GameTime = 0.0f;
-			CurrentDay++;
-			StartDayPhase();
-		}
-	}
-}
-
-/**
- * 开始夜晚阶段
- * 
- * 功能：处理夜晚开始时的逻辑
- * 实现细节：
- * - 设置bIsNight为true
- * - 启动昼夜过渡效果
- * - 广播夜晚开始事件
- * - 准备敌人生成（暂时注释，后续实现）
- */
-void ASDTAGameMode::StartNightPhase()
-{
-	bIsNight = true;
-	
-	// 启动过渡效果
-	bIsTransitioning = true;
-	TransitionProgress = 0.0f;
-	bTransitionToNight = true;
-	
-	// 广播夜晚开始事件
-	UE_LOG(LogTemp, Log, TEXT("夜晚阶段开始！第 %d 天"), CurrentDay);
-	
-	// 广播游戏状态更新
-	BroadcastGameState();
-	
-	// 后续实现：开始敌人生成
-	// StartEnemySpawning();
-}
-
-/**
- * 开始白天阶段
- * 
- * 功能：处理白天开始时的逻辑
- * 实现细节：
- * - 设置bIsNight为false
- * - 启动昼夜过渡效果
- * - 广播白天开始事件
- * - 分配灵魂碎片用于升级
- * - 停止敌人生成（暂时注释，后续实现）
- */
-void ASDTAGameMode::StartDayPhase()
-{
-	bIsNight = false;
-	
-	// 启动过渡效果
-	bIsTransitioning = true;
-	TransitionProgress = 0.0f;
-	bTransitionToNight = false;
-	
-	// 广播白天开始事件
-	UE_LOG(LogTemp, Log, TEXT("白天阶段开始！第 %d 天"), CurrentDay);
-	
-	// 分配灵魂碎片用于升级
-	DistributeSoulFragments();
-	
-	// 广播游戏状态更新
-	BroadcastGameState();
-	
-	// 后续实现：停止敌人生成
-	// StopEnemySpawning();
-}
-#pragma endregion
 
 #pragma region 敌人生成系统 - 方法声明
 void ASDTAGameMode::SpawnEnemyWave()
@@ -616,6 +302,61 @@ USDTAPoolManager* ASDTAGameMode::GetPoolManager() const
 }
 
 /**
+ * 实现GetDayNightManager方法
+ * 
+ * 功能：提供对昼夜管理器的安全访问接口
+ * 实现细节：直接返回内部昼夜管理器实例的指针
+ * 
+ * @return 返回昼夜管理器实例，如果未初始化则返回nullptr
+ */
+USDTADayNightManager* ASDTAGameMode::GetDayNightManager() const
+{
+	return DayNightManager;
+}
+
+/**
+ * 昼夜状态变化回调
+ * 
+ * 功能：处理昼夜管理器的状态变化事件
+ * 实现细节：更新游戏模式的昼夜状态并广播游戏状态
+ * 
+ * @param bIsNowNight 当前是否为夜晚
+ */
+void ASDTAGameMode::OnDayNightStateChanged(bool bIsNowNight)
+{
+	bIsNight = bIsNowNight;
+	if (bIsNowNight)
+	{
+		UE_LOG(LogTemp, Log, TEXT("夜晚阶段开始！第 %d 天"), CurrentDay);
+	}
+	else
+	{
+		CurrentDay++;
+		UE_LOG(LogTemp, Log, TEXT("白天阶段开始！第 %d 天"), CurrentDay);
+		// 分配灵魂碎片用于升级
+		DistributeSoulFragments();
+	}
+	
+	// 广播游戏状态更新
+	BroadcastGameState();
+}
+
+/**
+ * 时间更新回调
+ * 
+ * 功能：处理昼夜管理器的时间更新事件
+ * 实现细节：更新游戏模式的时间状态并广播游戏状态
+ * 
+ * @param RemainingTime 剩余时间
+ * @param TimePercent 时间百分比
+ */
+void ASDTAGameMode::OnTimeUpdated(float RemainingTime, float TimePercent)
+{
+	// 广播游戏状态更新
+	BroadcastGameState();
+}
+
+/**
  * 开始游戏
  * 
  * 功能：初始化游戏状态并开始游戏
@@ -634,12 +375,6 @@ void ASDTAGameMode::StartGame()
 	GameTime = 0.0f;
 	CurrentDay = 1;
 	bIsNight = false;
-	
-	// 设置初始光源状态为白天
-	SetLightIntensityBasedOnTime(false);
-	
-	// 设置初始大气状态为白天
-	SetAtmosphereColorBasedOnTime(false);
 	
 	// 分配初始灵魂碎片
 	DistributeSoulFragments();
@@ -681,21 +416,11 @@ void ASDTAGameMode::LoadGameProgress()
 /**
  * 更新游戏UI
  * 
- * 功能：计算游戏状态数据并调用BroadcastGameState更新UI
- * 实现细节：
- * - 计算当前阶段的剩余时间
- * - 计算时间百分比（用于进度条显示）
- * - 调用BroadcastGameState广播游戏状态
+ * 功能：调用BroadcastGameState更新UI
+ * 实现细节：直接调用BroadcastGameState方法，时间信息从昼夜管理器获取
  */
 void ASDTAGameMode::UpdateGameUI()
 {
-	// 计算剩余时间
-	float TotalDuration = bIsNight ? NightDuration : DayDuration;
-	float RemainingTime = FMath::Max(0.0f, TotalDuration - GameTime);
-	
-	// 计算时间百分比（用于进度条，从100%开始递减）
-	float TimePercent = FMath::Clamp(1.0f - (GameTime / TotalDuration), 0.0f, 1.0f);
-	
 	// 广播游戏状态更新
 	BroadcastGameState();
 }
@@ -707,15 +432,20 @@ void ASDTAGameMode::UpdateGameUI()
  * 实现细节：
  * - 遍历所有玩家控制器
  * - 获取每个玩家的HUD实例
- * - 计算当前阶段的剩余时间和百分比
+ * - 从昼夜管理器获取剩余时间和百分比
  * - 调用HUD的更新方法更新UI
  */
 void ASDTAGameMode::BroadcastGameState()
 {
-	// 计算当前阶段的剩余时间和百分比
-	float TotalDuration = bIsNight ? NightDuration : DayDuration;
-	float RemainingTime = FMath::Max(0.0f, TotalDuration - GameTime);
-	float TimePercent = FMath::Clamp(1.0f - (GameTime / TotalDuration), 0.0f, 1.0f);
+	// 从昼夜管理器获取时间信息
+	float RemainingTime = 0.0f;
+	float TimePercent = 0.0f;
+	
+	if (DayNightManager)
+	{
+		RemainingTime = DayNightManager->GetRemainingTime();
+		TimePercent = DayNightManager->GetTimePercent();
+	}
 	
 	// 遍历所有玩家控制器，更新他们的HUD
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
@@ -740,11 +470,17 @@ void ASDTAGameMode::BroadcastGameState()
 					// 调用HUD的更新方法更新UI
 					PlayerHUD->BP_UpdateDayNightCycle(bIsNight, CurrentDay, RemainingTime, TimePercent);
 				}
-				
-				// 输出游戏状态日志
-				// UE_LOG(LogTemp, Log, TEXT("游戏状态更新：昼夜=%d, 天数=%d, 剩余时间=%.2f, 百分比=%.2f"), bIsNight, CurrentDay, RemainingTime, TimePercent);
 			}
 		}
+	}
+	
+	// 控制日志输出频率：每秒最多输出一次
+	float CurrentTime = GetWorld()->GetTimeSeconds();
+	if (CurrentTime - LastLogTime >= 1.0f)
+	{
+		// 输出游戏状态日志
+		UE_LOG(LogTemp, Log, TEXT("游戏状态更新：昼夜=%d, 天数=%d, 剩余时间=%.2f, 百分比=%.2f"), bIsNight, CurrentDay, RemainingTime, TimePercent);
+		LastLogTime = CurrentTime;
 	}
 }
 #pragma endregion
