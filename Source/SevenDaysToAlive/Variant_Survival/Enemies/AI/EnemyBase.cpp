@@ -20,7 +20,7 @@
 // 3. 通过对象池管理器获取和回收敌人对象
 // 4. 在蓝图中设置属性和动画蒙太奇
 
-#include "Variant_Survival/Core/AI/EnemyBase.h"
+#include "Variant_Survival/Enemies/AI/EnemyBase.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 

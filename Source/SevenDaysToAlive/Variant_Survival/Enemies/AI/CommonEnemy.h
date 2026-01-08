@@ -4,7 +4,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Variant_Survival/Core/AI/EnemyBase.h"
+#include "Variant_Survival/Enemies/AI/EnemyBase.h"
 #include "CommonEnemy.generated.h"
 
 /**

@@ -36,7 +36,7 @@
 #include "GameFramework/Actor.h"
 
 // 包含敌人基类头文件，用于敌人对象的特殊处理
-#include "Variant_Survival/Core/AI/EnemyBase.h"
+#include "Variant_Survival/Enemies/AI/EnemyBase.h"
 
 
 /**

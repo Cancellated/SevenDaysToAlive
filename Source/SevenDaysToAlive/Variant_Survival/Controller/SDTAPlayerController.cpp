@@ -352,3 +352,13 @@ void ASDTAPlayerController::ShowHitFeedback()
 	}
 }
 
+/**
+ * 获取PlayerHUD实例
+ * 
+ * @return PlayerHUD实例指针
+ */
+USDTAPlayerHUD* ASDTAPlayerController::GetPlayerHUD() const
+{
+	return PlayerHUD;
+}
+

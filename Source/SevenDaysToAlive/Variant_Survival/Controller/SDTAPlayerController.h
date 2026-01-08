@@ -106,6 +106,9 @@ public:
 	/** 获取当前控制的SDTA角色 */
 	ASDTAPlayer* GetControlledSDTAPlayer() const;
 
+	/** 获取PlayerHUD实例 */
+	USDTAPlayerHUD* GetPlayerHUD() const;
+
 	/** 更新武器计数器UI */
 	void UpdateWeaponCounterUI(int32 CurrentAmmo, int32 MagazineSize);
 

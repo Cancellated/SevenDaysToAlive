@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameMode.h"
-#include "Variant_Survival/Core/AI/EnemyBase.h"
+#include "Variant_Survival/Enemies/AI/EnemyBase.h"
 #include "SDTAGameMode.generated.h"
 
 /**
@@ -98,10 +98,7 @@ public:
 public:
 	// 灵魂碎片管理
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Resource System")
-	int32 TotalSoulFragments; // 总收集的灵魂碎片
-	
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Resource System")
-	int32 AvailableSoulFragments; // 可用灵魂碎片（白天升级用）
+	int32 SoulFragments; // 可用灵魂碎片（白天升级用）
 	
 	// 升级系统
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Upgrade System")

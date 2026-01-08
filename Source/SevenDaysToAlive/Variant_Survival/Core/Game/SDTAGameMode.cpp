@@ -32,6 +32,11 @@
 // 包含对象池管理器头文件
 #include "Variant_Survival/Core/Pool/SDTAPoolManager.h"
 
+// 包含HUD头文件
+#include "Variant_Survival/UI/SDTAPlayerHUD.h"
+#include "Variant_Survival/Controller/SDTAPlayerController.h"
+#include "Blueprint/UserWidget.h"
+
 #pragma region 构造函数和基础方法
 ASDTAGameMode::ASDTAGameMode()
 {
@@ -40,14 +45,13 @@ ASDTAGameMode::ASDTAGameMode()
 	CurrentDay = 1;
 	bIsNight = false;
 	
-	DayDuration = 60.0f; // 1分钟白天
-	NightDuration = 180.0f; // 3分钟夜晚
+	DayDuration = 120.0f; // 2分钟白天（用于升级准备）
+	NightDuration = 300.0f; // 5分钟夜晚（用于战斗）
 	
 	CurrentEnemyCount = 0;
 	MaxEnemyCount = 20;
 	
-	TotalSoulFragments = 0;
-	AvailableSoulFragments = 0;
+	SoulFragments = 0;
 	
 	MaxPlayers = 4;
 	TeamScore = 0;
@@ -103,8 +107,7 @@ void ASDTAGameMode::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	DOREPLIFETIME(ASDTAGameMode, bIsNight);						// 是否夜晚
 	DOREPLIFETIME(ASDTAGameMode, CurrentEnemyCount);			// 当前敌人数量
 	DOREPLIFETIME(ASDTAGameMode, MaxEnemyCount);				// 最大敌人数量
-	DOREPLIFETIME(ASDTAGameMode, TotalSoulFragments);			// 总灵魂碎片数量
-	DOREPLIFETIME(ASDTAGameMode, AvailableSoulFragments);		// 可用灵魂碎片数量
+	DOREPLIFETIME(ASDTAGameMode, SoulFragments);				// 灵魂碎片数量
 	DOREPLIFETIME(ASDTAGameMode, PlayerUpgrades);				// 玩家升级信息
 	DOREPLIFETIME(ASDTAGameMode, ConnectedPlayers);				// 已连接玩家列表
 	DOREPLIFETIME(ASDTAGameMode, MaxPlayers);					// 最大玩家数量
@@ -115,25 +118,99 @@ void ASDTAGameMode::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 }
 #pragma endregion
 
-#pragma region 昼夜循环系统 - 方法声明
+#pragma region 昼夜循环系统 - 方法实现
+/**
+ * 更新游戏时间
+ * 
+ * 功能：根据DeltaTime更新游戏内时间
+ * 实现细节：简单累加DeltaTime到GameTime变量
+ * 
+ * @param DeltaTime 帧间隔时间（秒）
+ */
 void ASDTAGameMode::UpdateGameTime(float DeltaTime)
 {
-	// TODO: 实现游戏时间更新逻辑
+	GameTime += DeltaTime;
 }
 
+/**
+ * 检查昼夜切换
+ * 
+ * 功能：根据当前游戏时间判断是否需要进行昼夜切换
+ * 实现细节：
+ * - 白天：检查是否达到白天持续时间
+ * - 夜晚：检查是否达到夜晚持续时间
+ * - 达到时间后调用相应的阶段开始方法
+ */
 void ASDTAGameMode::CheckDayNightTransition()
 {
-	// TODO: 实现昼夜切换检查逻辑
+	if (!bIsNight)
+	{
+		// 白天阶段：检查是否达到白天持续时间
+		if (GameTime >= DayDuration)
+		{
+			// 重置游戏时间并开始夜晚阶段
+			GameTime = 0.0f;
+			StartNightPhase();
+		}
+	}
+	else
+	{
+		// 夜晚阶段：检查是否达到夜晚持续时间
+		if (GameTime >= NightDuration)
+		{
+			// 重置游戏时间并开始白天阶段
+			GameTime = 0.0f;
+			CurrentDay++;
+			StartDayPhase();
+		}
+	}
 }
 
+/**
+ * 开始夜晚阶段
+ * 
+ * 功能：处理夜晚开始时的逻辑
+ * 实现细节：
+ * - 设置bIsNight为true
+ * - 广播夜晚开始事件
+ * - 准备敌人生成（暂时注释，后续实现）
+ */
 void ASDTAGameMode::StartNightPhase()
 {
-	// TODO: 实现夜晚开始逻辑
+	bIsNight = true;
+	
+	// 广播夜晚开始事件
+	UE_LOG(LogTemp, Log, TEXT("夜晚阶段开始！第 %d 天"), CurrentDay);
+	
+	// 广播游戏状态更新
+	BroadcastGameState();
+	
+	// 后续实现：开始敌人生成
+	// StartEnemySpawning();
 }
 
+/**
+ * 开始白天阶段
+ * 
+ * 功能：处理白天开始时的逻辑
+ * 实现细节：
+ * - 设置bIsNight为false
+ * - 广播白天开始事件
+ * - 分配灵魂碎片用于升级
+ * - 停止敌人生成（暂时注释，后续实现）
+ */
 void ASDTAGameMode::StartDayPhase()
 {
-	// TODO: 实现白天开始逻辑
+	bIsNight = false;
+	
+	// 广播白天开始事件
+	UE_LOG(LogTemp, Log, TEXT("白天阶段开始！第 %d 天"), CurrentDay);
+	
+	// 分配灵魂碎片用于升级
+	DistributeSoulFragments();
+	
+	// 后续实现：停止敌人生成
+	// StopEnemySpawning();
 }
 #pragma endregion
 
@@ -165,14 +242,34 @@ void ASDTAGameMode::CleanupDeadEnemies()
 #pragma endregion
 
 #pragma region 资源与升级系统 - 方法声明
+/**
+ * 收集灵魂碎片
+ * 
+ * 功能：收集敌人掉落的灵魂碎片
+ * 实现细节：
+ * - 将收集到的碎片直接添加到可用灵魂碎片中
+ * - 记录收集日志
+ * 
+ * @param Amount 收集的灵魂碎片数量
+ */
 void ASDTAGameMode::CollectSoulFragments(int32 Amount)
 {
-	// TODO: 实现灵魂碎片收集逻辑
+	SoulFragments += Amount;
+	
+	UE_LOG(LogTemp, Log, TEXT("收集了 %d 个灵魂碎片。可用数量：%d"), Amount, SoulFragments);
 }
 
+/**
+ * 分配灵魂碎片
+ * 
+ * 功能：在白天开始时准备灵魂碎片用于升级
+ * 实现细节：
+ * - 由于现在直接使用可用灵魂碎片，此方法主要用于日志记录和未来扩展
+ */
 void ASDTAGameMode::DistributeSoulFragments()
 {
-	// TODO: 实现碎片分配逻辑
+	// 直接使用可用灵魂碎片，无需额外分配
+	UE_LOG(LogTemp, Log, TEXT("灵魂碎片已准备就绪：%d 个可用用于升级"), SoulFragments);
 }
 
 void ASDTAGameMode::ApplyPlayerUpgrade(const FName& UpgradeName)
@@ -241,9 +338,34 @@ USDTAPoolManager* ASDTAGameMode::GetPoolManager() const
 	return PoolManager;
 }
 
+/**
+ * 开始游戏
+ * 
+ * 功能：初始化游戏状态并开始游戏
+ * 实现细节：
+ * - 设置游戏状态为已开始
+ * - 重置游戏时间
+ * - 开始第一天白天阶段
+ * - 分配初始灵魂碎片
+ */
 void ASDTAGameMode::StartGame()
 {
-	// TODO: 实现游戏开始逻辑
+	bGameStarted = true;
+	bGameOver = false;
+	bVictory = false;
+	
+	GameTime = 0.0f;
+	CurrentDay = 1;
+	bIsNight = false;
+	
+	// 分配初始灵魂碎片
+	DistributeSoulFragments();
+	
+	// 开始第一天白天阶段
+	UE_LOG(LogTemp, Log, TEXT("游戏开始！第 1 天开始。"));
+	
+	// 广播游戏状态更新
+	BroadcastGameState();
 }
 
 void ASDTAGameMode::EndGame(bool bWin)
@@ -273,14 +395,74 @@ void ASDTAGameMode::LoadGameProgress()
 #pragma endregion
 
 #pragma region UI与事件系统 - 方法声明
+/**
+ * 更新游戏UI
+ * 
+ * 功能：计算游戏状态数据并调用BroadcastGameState更新UI
+ * 实现细节：
+ * - 计算当前阶段的剩余时间
+ * - 计算时间百分比（用于进度条显示）
+ * - 调用BroadcastGameState广播游戏状态
+ */
 void ASDTAGameMode::UpdateGameUI()
 {
-	// TODO: 实现UI更新逻辑
+	// 计算剩余时间
+	float TotalDuration = bIsNight ? NightDuration : DayDuration;
+	float RemainingTime = FMath::Max(0.0f, TotalDuration - GameTime);
+	
+	// 计算时间百分比（用于进度条，从100%开始递减）
+	float TimePercent = FMath::Clamp(1.0f - (GameTime / TotalDuration), 0.0f, 1.0f);
+	
+	// 广播游戏状态更新
+	BroadcastGameState();
 }
 
+/**
+ * 广播游戏状态
+ * 
+ * 功能：将游戏状态数据同步到所有玩家的HUD
+ * 实现细节：
+ * - 遍历所有玩家控制器
+ * - 获取每个玩家的HUD实例
+ * - 计算当前阶段的剩余时间和百分比
+ * - 调用HUD的更新方法更新UI
+ */
 void ASDTAGameMode::BroadcastGameState()
 {
-	// TODO: 实现游戏状态广播
+	// 计算当前阶段的剩余时间和百分比
+	float TotalDuration = bIsNight ? NightDuration : DayDuration;
+	float RemainingTime = FMath::Max(0.0f, TotalDuration - GameTime);
+	float TimePercent = FMath::Clamp(1.0f - (GameTime / TotalDuration), 0.0f, 1.0f);
+	
+	// 遍历所有玩家控制器，更新他们的HUD
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		APlayerController* PC = It->Get();
+		if (PC)
+		{
+			// 将PC转换为ASDTAPlayerController类型
+			ASDTAPlayerController* SDTAPC = Cast<ASDTAPlayerController>(PC);
+			if (SDTAPC)
+			{
+				// 获取PlayerHUD实例
+				USDTAPlayerHUD* PlayerHUD = SDTAPC->GetPlayerHUD();
+				if (PlayerHUD)
+				{
+					// 更新HUD的属性
+					PlayerHUD->bIsNight = bIsNight;
+					PlayerHUD->CurrentDay = CurrentDay;
+					PlayerHUD->RemainingTime = RemainingTime;
+					PlayerHUD->TimePercent = TimePercent;
+					
+					// 调用HUD的更新方法更新UI
+					PlayerHUD->BP_UpdateDayNightCycle(bIsNight, CurrentDay, RemainingTime, TimePercent);
+				}
+				
+				// 输出游戏状态日志
+				UE_LOG(LogTemp, Log, TEXT("游戏状态更新：昼夜=%d, 天数=%d, 剩余时间=%.2f, 百分比=%.2f"), bIsNight, CurrentDay, RemainingTime, TimePercent);
+			}
+		}
+	}
 }
 #pragma endregion
 

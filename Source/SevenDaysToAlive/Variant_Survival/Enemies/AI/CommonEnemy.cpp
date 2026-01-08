@@ -1,6 +1,6 @@
 // 七日求生普通敌人类实现
 
-#include "Variant_Survival/Core/AI/CommonEnemy.h"
+#include "Variant_Survival/Enemies/AI/CommonEnemy.h"
 #include "Variant_Survival/Characters/SDTAPlayer.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"

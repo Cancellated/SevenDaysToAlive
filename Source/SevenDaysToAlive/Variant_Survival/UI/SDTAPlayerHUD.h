@@ -40,13 +40,17 @@ public:
     int32 MaxStamina = 100;
 
 protected:
-    /** 健康值百分比变化时的回调 */
-    UFUNCTION()
-    void OnHealthPercentChanged();
+	/** 健康值百分比变化时的回调 */
+	UFUNCTION()
+	void OnHealthPercentChanged();
 
-    /** 能量值百分比变化时的回调 */
-    UFUNCTION()
-    void OnStaminaPercentChanged();
+	/** 能量值百分比变化时的回调 */
+	UFUNCTION()
+	void OnStaminaPercentChanged();
+
+	/** 时间百分比变化时的回调 */
+	UFUNCTION()
+	void OnTimePercentChanged();
 
 public:
     /** 更新健康值显示 */
@@ -64,4 +68,33 @@ public:
     /** 重置HUD显示 */
     UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "SDTA HUD")
     void BP_ResetHUD();
+
+public:
+    /** 当前是否为夜晚阶段 */
+    UPROPERTY(BlueprintReadWrite, Category = "SDTA HUD", Meta = (ExposeOnSpawn = true, DisplayName = "Is Night"))
+    bool bIsNight = false;
+
+    /** 当前天数 */
+    UPROPERTY(BlueprintReadWrite, Category = "SDTA HUD", Meta = (ExposeOnSpawn = true, DisplayName = "Current Day"))
+    int32 CurrentDay = 1;
+
+    /** 剩余时间（秒） */
+    UPROPERTY(BlueprintReadWrite, Category = "SDTA HUD", Meta = (ExposeOnSpawn = true, DisplayName = "Remaining Time"))
+    float RemainingTime = 0.0f;
+
+    /** 剩余时间百分比（用于进度条） */
+	UPROPERTY(BlueprintReadWrite, Category = "SDTA HUD", Meta = (ExposeOnSpawn = true, DisplayName = "Time Percent", OnChanged="OnTimePercentChanged"))
+	float TimePercent = 1.0f;
+
+	/** 灵魂碎片数量 */
+	UPROPERTY(BlueprintReadWrite, Category = "SDTA HUD", Meta = (ExposeOnSpawn = true, DisplayName = "Soul Fragments"))
+	int32 SoulFragments = 0;
+
+    /** 更新昼夜循环显示 */
+    UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "SDTA HUD")
+    void BP_UpdateDayNightCycle(bool bInIsNight, int32 InCurrentDay, float InRemainingTime, float InTimePercent);
+
+    /** 更新灵魂碎片显示 */
+    UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "SDTA HUD")
+    void BP_UpdateSoulFragments();
 };
