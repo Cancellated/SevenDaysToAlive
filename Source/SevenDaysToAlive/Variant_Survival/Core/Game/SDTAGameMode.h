@@ -63,6 +63,28 @@ public:
 	// 时间更新逻辑
 	void UpdateGameTime(float DeltaTime);
 	void CheckDayNightTransition();
+	
+	// 渐变系统
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Transition")
+	float TransitionDuration; // 昼夜过渡持续时间（秒）
+	
+	UPROPERTY(BlueprintReadOnly, Category = "Transition")
+	bool bIsTransitioning; // 是否正在过渡
+	
+private:
+	float TransitionProgress; // 过渡进度（0-1）
+	bool bTransitionToNight; // 是否过渡到夜晚
+	
+	/**
+	 * 应用过渡效果
+	 * 
+	 * 功能：在昼夜过渡过程中，平滑调整光源亮度、颜色和大气颜色
+	 * 用途：在Tick中调用，实现平滑的昼夜过渡效果
+	 * 
+	 * @param Progress 过渡进度（0-1）
+	 * @param bToNight 是否过渡到夜晚
+	 */
+	void ApplyTransitionEffects(float Progress, bool bToNight);
 #pragma endregion
 
 #pragma region 敌人生成系统
@@ -178,6 +200,61 @@ public:
 	// UI更新方法
 	void UpdateGameUI();
 	void BroadcastGameState();
+#pragma endregion
+
+#pragma region 光源管理系统
+public:
+	// 光源配置
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Light Management")
+	float DayLightIntensity; // 白天光源亮度
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Light Management")
+	float NightLightIntensity; // 夜晚光源亮度
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Light Management")
+	FLinearColor DayLightColor; // 白天光源颜色
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Light Management")
+	FLinearColor NightLightColor; // 夜晚光源颜色
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Light Management")
+	FName LightTag; // 光源标签
+
+	// 大气配置
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Light Management")
+	FLinearColor DayAtmosphereColor; // 白天大气瑞利散射颜色
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Light Management")
+	FLinearColor NightAtmosphereColor; // 夜晚大气瑞利散射颜色
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Light Management")
+	FName AtmosphereTag; // 大气标签
+
+	/**
+	 * 获取世界中的光源列表
+	 * 
+	 * 功能：遍历世界中的所有光源，可选择按标签筛选
+	 * 用途：用于获取需要调整亮度的光源
+	 * 
+	 * @param OptionalTag 可选的光源标签筛选
+	 * @return 返回符合条件的光源列表
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Light Management")
+	TArray<class ULightComponent*> GetWorldLights(const FName& OptionalTag = NAME_None);
+	
+	/**
+	 * 设置光源亮度和颜色
+	 * 
+	 * 功能：根据昼夜状态调整光源的亮度和颜色
+	 * 用途：在昼夜切换时调用，实现场景光照的变化
+	 * 
+	 * @param bNight 是否为夜晚
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Light Management")
+	void SetLightIntensityBasedOnTime(bool bNight);
+
+	UFUNCTION(BlueprintCallable, Category = "Light Management")
+	void SetAtmosphereColorBasedOnTime(bool bNight);
 #pragma endregion
 
 private:
