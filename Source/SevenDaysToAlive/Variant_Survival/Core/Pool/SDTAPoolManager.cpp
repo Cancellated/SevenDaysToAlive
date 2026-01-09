@@ -38,6 +38,9 @@
 // 包含敌人基类头文件，用于敌人对象的特殊处理
 #include "Variant_Survival/Enemies/AI/EnemyBase.h"
 
+// 包含工作台头文件，用于工作台对象的特殊处理
+#include "Variant_Survival/Upgrade/WorkStation.h"
+
 
 /**
  * USDTAPoolManager构造函数
@@ -437,6 +440,15 @@ void USDTAPoolManager::ResetObject(UObject* Object)
 		{
 			// 调用EnemyBase的Reset方法，确保敌人状态完全重置
 			Enemy->Reset();
+			return;
+		}
+
+		// 检查是否是WorkStation类型
+		class AWorkStation* WorkStation = Cast<AWorkStation>(Actor);
+		if (WorkStation)
+		{
+			// 调用WorkStation的Reset方法，确保工作台状态完全重置
+			WorkStation->Reset();
 			return;
 		}
 
