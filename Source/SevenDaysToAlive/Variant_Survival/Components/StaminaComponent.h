@@ -5,19 +5,19 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Net/UnrealNetwork.h" // 添加网络相关头文件
-#include "StaminaSystemComponent.generated.h"
+#include "StaminaComponent.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnStaminaChangedComponent, float, StaminaPercent);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnStaminaLowWarningComponent);
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
-class SEVENDAYSTOALIVE_API UStaminaSystemComponent : public UActorComponent
+class SEVENDAYSTOALIVE_API UStaminaComponent : public UActorComponent
 {
     GENERATED_BODY()
 
 public:
     // Sets default values for this component's properties
-    UStaminaSystemComponent();
+    UStaminaComponent();
 
 protected:
     // Called when the game starts

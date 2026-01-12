@@ -43,7 +43,7 @@ public:
 	virtual void AttackPlayer() override;
 
 	// 获取玩家角色
-	class ASDTAPlayer* GetPlayerCharacter();
+	class ASDTAPlayerBase* GetPlayerCharacter();
 
 	// 检查玩家是否在范围内
 	bool IsPlayerInRange(float Range);
@@ -55,7 +55,7 @@ private:
 
 	// 玩家引用
 	UPROPERTY()
-	class ASDTAPlayer* PlayerRef;
+	class ASDTAPlayerBase* PlayerRef;
 
 	// 初始位置（用于巡逻）
 	FVector InitialLocation;

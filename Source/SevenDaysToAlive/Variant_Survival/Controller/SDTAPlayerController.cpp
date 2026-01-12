@@ -7,7 +7,8 @@
 #include "InputMappingContext.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/PlayerStart.h"
-#include "Variant_Survival/Characters/SDTAPlayer.h"
+#include "Variant_Survival/Characters/SDTAPlayerBase.h"
+#include "Variant_Survival/Components/HealthComponent.h"
 #include "SevenDaysToAlive.h"
 #include "Widgets/Input/SVirtualJoystick.h"
 
@@ -38,21 +39,7 @@ void ASDTAPlayerController::BeginPlay()
 			UE_LOG(LogSevenDaysToAlive, Error, TEXT("Could not spawn player HUD widget."));
 		}
 
-		// spawn mobile controls if needed
-		if (ShouldUseTouchControls())
-		{
-			// spawn the mobile controls widget
-			MobileControlsWidget = CreateWidget<UUserWidget>(this, MobileControlsWidgetClass);
-
-			if (MobileControlsWidget)
-			{
-				MobileControlsWidget->AddToPlayerScreen(0);
-			}
-			else
-			{
-				UE_LOG(LogSevenDaysToAlive, Error, TEXT("Could not spawn mobile controls widget."));
-			}
-		}
+		// 移动控件暂时不使用
 
 		// 初始化跟踪整数变量
 		LastHealthInt = -1;
@@ -119,6 +106,16 @@ void ASDTAPlayerController::SetupInputComponent()
 	}
 }
 
+/** 处理冲刺输入 */
+void ASDTAPlayerController::HandleDashInput()
+{
+	ASDTAPlayerBase* SDTAPlayer = GetControlledSDTAPlayer();
+	if (SDTAPlayer)
+	{
+		SDTAPlayer->DoDashStart();
+	}
+}
+
 void ASDTAPlayerController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
@@ -126,23 +123,79 @@ void ASDTAPlayerController::OnPossess(APawn* InPawn)
 	// subscribe to the pawn's OnDestroyed delegate
 	InPawn->OnDestroyed.AddDynamic(this, &ASDTAPlayerController::OnPawnDestroyed);
 
+	// 确保UI存在且可见
+	if (IsLocalPlayerController())
+	{
+		if (!PlayerHUD)
+		{
+			// 如果UI不存在，重新创建
+			PlayerHUD = CreateWidget<USDTAPlayerHUD>(this, PlayerHUDClass);
+			if (PlayerHUD)
+			{
+				PlayerHUD->AddToPlayerScreen(0);
+				UE_LOG(LogSevenDaysToAlive, Log, TEXT("HUD已添加到视口"));
+			}
+			else
+			{
+				UE_LOG(LogSevenDaysToAlive, Error, TEXT("无法创建玩家HUD"));
+			}
+		}
+		else if (!PlayerHUD->IsInViewport())
+		{
+			// 如果UI存在但不在视口中，重新添加
+			PlayerHUD->AddToPlayerScreen(0);
+			UE_LOG(LogSevenDaysToAlive, Log, TEXT("HUD已重新添加到视口"));
+		}
+
+		// 重新创建DebugUI（如果指定了UI类且不存在）
+		if (DebugUIWidgetClass && !DebugUIWidget)
+		{
+			DebugUIWidget = CreateWidget<USDTADebugUI>(this, DebugUIWidgetClass);
+			if (DebugUIWidget)
+			{
+				DebugUIWidget->AddToPlayerScreen(1);
+				UE_LOG(LogSevenDaysToAlive, Log, TEXT("Debug UI已重新创建"));
+			}
+		}
+
+		// 重新创建WeaponUI（如果指定了UI类且不存在）
+		if (WeaponUIWidgetClass && !WeaponUI)
+		{
+			WeaponUI = CreateWidget<USDTAWeaponUI>(this, WeaponUIWidgetClass);
+			if (WeaponUI)
+			{
+				WeaponUI->AddToPlayerScreen(0);
+				UE_LOG(LogSevenDaysToAlive, Log, TEXT("Weapon UI已重新创建"));
+			}
+		}
+	}
+
 	// is this a SDTA character?
-	if (ASDTAPlayer* SDTAPlayer = Cast<ASDTAPlayer>(InPawn))
+	if (ASDTAPlayerBase* SDTAPlayer = Cast<ASDTAPlayerBase>(InPawn))
 	{
 		// add the player tag
 		SDTAPlayer->Tags.Add(PlayerPawnTag);
 
-		// subscribe to the pawn's delegates
+		// 绑定健康和死亡事件
 		SDTAPlayer->OnHealthChanged.AddDynamic(this, &ASDTAPlayerController::OnHealthChanged);
-		SDTAPlayer->OnStaminaChanged.AddDynamic(this, &ASDTAPlayerController::OnStaminaChanged);
 		SDTAPlayer->OnDeath.AddDynamic(this, &ASDTAPlayerController::OnPawnDeath);
 
-		// force update the health and stamina bars
-		float HealthPercent = SDTAPlayer->HealthComponent ? (SDTAPlayer->HealthComponent->Health / SDTAPlayer->HealthComponent->MaxHealth) : 0.0f;
-		SDTAPlayer->OnHealthChanged.Broadcast(HealthPercent);
+		// 绑定耐力变化事件
+		SDTAPlayer->OnStaminaChanged.AddDynamic(this, &ASDTAPlayerController::OnStaminaChanged);
 
-		float StaminaPercent = SDTAPlayer->StaminaComponent ? (SDTAPlayer->StaminaComponent->Stamina / SDTAPlayer->StaminaComponent->MaxStamina) : 0.0f;
-		SDTAPlayer->OnStaminaChanged.Broadcast(StaminaPercent);
+		// 立即更新UI
+		if (SDTAPlayer->HealthComponent)
+		{
+			float HealthPercent = SDTAPlayer->HealthComponent->Health / SDTAPlayer->HealthComponent->MaxHealth;
+			SDTAPlayer->OnHealthChanged.Broadcast(HealthPercent);
+		}
+
+		// 立即更新耐力UI
+		if (SDTAPlayer->StaminaComponent)
+		{
+			float StaminaPercent = SDTAPlayer->StaminaComponent->Stamina / SDTAPlayer->StaminaComponent->MaxStamina;
+			SDTAPlayer->OnStaminaChanged.Broadcast(StaminaPercent);
+		}
 	}
 }
 
@@ -160,11 +213,10 @@ void ASDTAPlayerController::OnUnPossess()
 		ControlledPawn->OnDestroyed.RemoveDynamic(this, &ASDTAPlayerController::OnPawnDestroyed);
 
 		// If it's a SDTA player character, unsubscribe from its delegates
-		if (ASDTAPlayer* SDTAPlayer = Cast<ASDTAPlayer>(ControlledPawn))
+		if (ASDTAPlayerBase* SDTAPlayer = Cast<ASDTAPlayerBase>(ControlledPawn))
 		{
-			// Unsubscribe from all pawn delegates
+			// 移除健康和死亡事件绑定
 			SDTAPlayer->OnHealthChanged.RemoveDynamic(this, &ASDTAPlayerController::OnHealthChanged);
-			SDTAPlayer->OnStaminaChanged.RemoveDynamic(this, &ASDTAPlayerController::OnStaminaChanged);
 			SDTAPlayer->OnDeath.RemoveDynamic(this, &ASDTAPlayerController::OnPawnDeath);
 		}
 	}
@@ -189,11 +241,14 @@ void ASDTAPlayerController::EndPlay(EEndPlayReason::Type EndPlayReason)
 		ControlledPawn->OnDestroyed.RemoveDynamic(this, &ASDTAPlayerController::OnPawnDestroyed);
 
 		// 如果是SDTA玩家角色，移除所有相关委托
-		if (ASDTAPlayer* SDTAPlayer = Cast<ASDTAPlayer>(ControlledPawn))
+		if (ASDTAPlayerBase* SDTAPlayer = Cast<ASDTAPlayerBase>(ControlledPawn))
 		{
+			// 移除健康和死亡事件绑定
 			SDTAPlayer->OnHealthChanged.RemoveDynamic(this, &ASDTAPlayerController::OnHealthChanged);
-			SDTAPlayer->OnStaminaChanged.RemoveDynamic(this, &ASDTAPlayerController::OnStaminaChanged);
 			SDTAPlayer->OnDeath.RemoveDynamic(this, &ASDTAPlayerController::OnPawnDeath);
+			
+			// 移除耐力变化事件绑定
+			SDTAPlayer->OnStaminaChanged.RemoveDynamic(this, &ASDTAPlayerController::OnStaminaChanged);
 		}
 	}
 
@@ -207,17 +262,19 @@ void ASDTAPlayerController::OnPawnDestroyed(AActor* DestroyedActor)
 	// 这里可以添加UI重置逻辑
 
 	// 无论控制器是否还拥有该pawn，只要它是SDTA玩家角色，就解绑所有委托
-	// 这确保了即使pawn在控制器不再拥有它后被销毁，委托也能被正确清理
-	if (ASDTAPlayer* SDTAPlayer = Cast<ASDTAPlayer>(DestroyedActor))
-	{
-		// 解绑所有委托
-		SDTAPlayer->OnHealthChanged.RemoveDynamic(this, &ASDTAPlayerController::OnHealthChanged);
-		SDTAPlayer->OnStaminaChanged.RemoveDynamic(this, &ASDTAPlayerController::OnStaminaChanged);
-		SDTAPlayer->OnDeath.RemoveDynamic(this, &ASDTAPlayerController::OnPawnDeath);
-		
-		// 确保从OnDestroyed事件中解绑，防止重复调用
-		SDTAPlayer->OnDestroyed.RemoveDynamic(this, &ASDTAPlayerController::OnPawnDestroyed);
-	}
+		// 这确保了即使pawn在控制器不再拥有它后被销毁，委托也能被正确清理
+		if (ASDTAPlayerBase* SDTAPlayer = Cast<ASDTAPlayerBase>(DestroyedActor))
+		{
+			// 移除健康和死亡事件绑定
+			SDTAPlayer->OnHealthChanged.RemoveDynamic(this, &ASDTAPlayerController::OnHealthChanged);
+			SDTAPlayer->OnDeath.RemoveDynamic(this, &ASDTAPlayerController::OnPawnDeath);
+			
+			// 移除耐力变化事件绑定
+			SDTAPlayer->OnStaminaChanged.RemoveDynamic(this, &ASDTAPlayerController::OnStaminaChanged);
+			
+			// 移除OnDestroyed委托
+			SDTAPlayer->OnDestroyed.RemoveDynamic(this, &ASDTAPlayerController::OnPawnDestroyed);
+		}
 
 	// find the player start
 	TArray<AActor*> ActorList;
@@ -231,7 +288,7 @@ void ASDTAPlayerController::OnPawnDestroyed(AActor* DestroyedActor)
 		// spawn a character at the player start
 		const FTransform SpawnTransform = RandomPlayerStart->GetActorTransform();
 
-		if (ASDTAPlayer* RespawnedCharacter = GetWorld()->SpawnActor<ASDTAPlayer>(CharacterClass, SpawnTransform))
+		if (ASDTAPlayerBase* RespawnedCharacter = GetWorld()->SpawnActor<ASDTAPlayerBase>(CharacterClass, SpawnTransform))
 		{
 			// possess the character
 			Possess(RespawnedCharacter);
@@ -244,28 +301,26 @@ void ASDTAPlayerController::OnHealthChanged(float HealthPercent)
 	// 更新健康值UI
 	if (PlayerHUD)
 	{
-		ASDTAPlayer* SDTAPlayer = GetControlledSDTAPlayer();
-		if (SDTAPlayer)
+		ASDTAPlayerBase* SDTAPlayer = GetControlledSDTAPlayer();
+		if (SDTAPlayer && SDTAPlayer->HealthComponent)
 		{
-			// 更新健康值百分比（总是更新，用于进度条）
+			// 更新健康值百分比
 			PlayerHUD->HealthPercent = HealthPercent;
-
-			// 将当前值转换为整数
-			int32 CurrentHealthInt = SDTAPlayer->HealthComponent ? FMath::RoundToInt(SDTAPlayer->HealthComponent->Health) : 0;
-			int32 MaxHealthInt = SDTAPlayer->HealthComponent ? FMath::RoundToInt(SDTAPlayer->HealthComponent->MaxHealth) : 0;
-
-			// 只有当整数部分变化时才更新HUD的当前值和最大值
+			
+			// 更新健康值文本显示
+			int32 CurrentHealthInt = FMath::RoundToInt(SDTAPlayer->HealthComponent->Health);
+			int32 MaxHealthInt = FMath::RoundToInt(SDTAPlayer->HealthComponent->MaxHealth);
+			
+			// 只有当值发生变化时才更新，避免不必要的UI刷新
 			if (CurrentHealthInt != LastHealthInt || MaxHealthInt != LastMaxHealthInt)
 			{
 				PlayerHUD->CurrentHealth = CurrentHealthInt;
 				PlayerHUD->MaxHealth = MaxHealthInt;
-
+				
 				// 更新跟踪变量
 				LastHealthInt = CurrentHealthInt;
 				LastMaxHealthInt = MaxHealthInt;
 			}
-
-			// BP_UpdateHealthBar会通过OnHealthPercentChanged自动调用
 		}
 	}
 }
@@ -275,28 +330,26 @@ void ASDTAPlayerController::OnStaminaChanged(float StaminaPercent)
 	// 更新能量值UI
 	if (PlayerHUD)
 	{
-		ASDTAPlayer* SDTAPlayer = GetControlledSDTAPlayer();
-		if (SDTAPlayer)
+		ASDTAPlayerBase* SDTAPlayer = GetControlledSDTAPlayer();
+		if (SDTAPlayer && SDTAPlayer->StaminaComponent)
 		{
-			// 更新能量值百分比（总是更新，用于进度条）
+			// 更新能量值百分比
 			PlayerHUD->StaminaPercent = StaminaPercent;
-
-			// 将当前值转换为整数
-			int32 CurrentStaminaInt = SDTAPlayer->StaminaComponent ? FMath::RoundToInt(SDTAPlayer->StaminaComponent->Stamina) : 0;
-			int32 MaxStaminaInt = SDTAPlayer->StaminaComponent ? FMath::RoundToInt(SDTAPlayer->StaminaComponent->MaxStamina) : 0;
-
-			// 只有当整数部分变化时才更新HUD的当前值和最大值
+			
+			// 更新能量值文本显示
+			int32 CurrentStaminaInt = FMath::RoundToInt(SDTAPlayer->StaminaComponent->Stamina);
+			int32 MaxStaminaInt = FMath::RoundToInt(SDTAPlayer->StaminaComponent->MaxStamina);
+			
+			// 只有当值发生变化时才更新，避免不必要的UI刷新
 			if (CurrentStaminaInt != LastStaminaInt || MaxStaminaInt != LastMaxStaminaInt)
 			{
 				PlayerHUD->CurrentStamina = CurrentStaminaInt;
 				PlayerHUD->MaxStamina = MaxStaminaInt;
-
+				
 				// 更新跟踪变量
 				LastStaminaInt = CurrentStaminaInt;
 				LastMaxStaminaInt = MaxStaminaInt;
 			}
-
-			// BP_UpdateStaminaBar会通过OnStaminaPercentChanged自动调用
 		}
 	}
 }
@@ -319,7 +372,7 @@ void ASDTAPlayerController::Tick(float DeltaSeconds)
 	// 更新DebugUI中的速度显示
 	if (DebugUIWidget)
 	{
-		ASDTAPlayer* SDTAPlayer = GetControlledSDTAPlayer();
+		ASDTAPlayerBase* SDTAPlayer = GetControlledSDTAPlayer();
 		if (SDTAPlayer)
 		{
 			// 获取角色当前速度（使用Velocity的大小）
@@ -329,9 +382,9 @@ void ASDTAPlayerController::Tick(float DeltaSeconds)
 	}
 }
 
-ASDTAPlayer* ASDTAPlayerController::GetControlledSDTAPlayer() const
+ASDTAPlayerBase* ASDTAPlayerController::GetControlledSDTAPlayer() const
 {
-	return Cast<ASDTAPlayer>(GetPawn());
+	return Cast<ASDTAPlayerBase>(GetPawn());
 }
 
 void ASDTAPlayerController::UpdateWeaponCounterUI(int32 CurrentAmmo, int32 MagazineSize)

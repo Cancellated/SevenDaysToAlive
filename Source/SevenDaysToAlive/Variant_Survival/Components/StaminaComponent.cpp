@@ -1,10 +1,10 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-#include "StaminaSystemComponent.h"
+#include "Variant_Survival/Components/StaminaComponent.h"
 #include "TimerManager.h"
 
 // Sets default values for this component's properties
-UStaminaSystemComponent::UStaminaSystemComponent()
+UStaminaComponent::UStaminaComponent()
 {
     // Set this component to be initialized when the game starts, and to be ticked every frame.
     PrimaryComponentTick.bCanEverTick = true;
@@ -18,7 +18,7 @@ UStaminaSystemComponent::UStaminaSystemComponent()
 }
 
 // Called when the game starts
-void UStaminaSystemComponent::BeginPlay()
+void UStaminaComponent::BeginPlay()
 {
     Super::BeginPlay();
 
@@ -28,7 +28,7 @@ void UStaminaSystemComponent::BeginPlay()
 }
 
 // Called every frame
-void UStaminaSystemComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+void UStaminaComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
     Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
@@ -48,7 +48,7 @@ void UStaminaSystemComponent::TickComponent(float DeltaTime, ELevelTick TickType
 }
 
 // 设置能量值
-void UStaminaSystemComponent::SetStamina(float NewStamina)
+void UStaminaComponent::SetStamina(float NewStamina)
 {
     float OldStamina = Stamina;
     Stamina = FMath::Clamp(NewStamina, 0.0f, MaxStamina);
@@ -65,19 +65,19 @@ void UStaminaSystemComponent::SetStamina(float NewStamina)
 }
 
 // 增加能量值
-void UStaminaSystemComponent::AddStamina(float StaminaToAdd)
+void UStaminaComponent::AddStamina(float StaminaToAdd)
 {
     SetStamina(Stamina + StaminaToAdd);
 }
 
 // 减少能量值
-void UStaminaSystemComponent::RemoveStamina(float StaminaToRemove)
+void UStaminaComponent::RemoveStamina(float StaminaToRemove)
 {
     SetStamina(Stamina - StaminaToRemove);
 }
 
 // 消耗能量值
-bool UStaminaSystemComponent::ConsumeStamina(float StaminaCost)
+bool UStaminaComponent::ConsumeStamina(float StaminaCost)
 {
     if (Stamina >= StaminaCost)
     {
@@ -88,26 +88,26 @@ bool UStaminaSystemComponent::ConsumeStamina(float StaminaCost)
 }
 
 // 开始能量回复
-void UStaminaSystemComponent::StartStaminaRegeneration()
+void UStaminaComponent::StartStaminaRegeneration()
 {
     bIsStaminaRegenerating = true;
 }
 
 // 停止能量回复
-void UStaminaSystemComponent::StopStaminaRegeneration()
+void UStaminaComponent::StopStaminaRegeneration()
 {
     bIsStaminaRegenerating = false;
 }
 
 // 实现网络复制属性配置
-void UStaminaSystemComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+void UStaminaComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     
     // 复制最大体力和当前体力值
-    DOREPLIFETIME(UStaminaSystemComponent, MaxStamina);
-    DOREPLIFETIME(UStaminaSystemComponent, Stamina);
+    DOREPLIFETIME(UStaminaComponent, MaxStamina);
+    DOREPLIFETIME(UStaminaComponent, Stamina);
     
     // 复制体力回复状态
-    DOREPLIFETIME(UStaminaSystemComponent, bIsStaminaRegenerating);
+    DOREPLIFETIME(UStaminaComponent, bIsStaminaRegenerating);
 }

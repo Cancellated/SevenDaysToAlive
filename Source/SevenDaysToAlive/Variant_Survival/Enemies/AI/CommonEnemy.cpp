@@ -1,7 +1,7 @@
 // 七日求生普通敌人类实现
 
 #include "Variant_Survival/Enemies/AI/CommonEnemy.h"
-#include "Variant_Survival/Characters/SDTAPlayer.h"
+#include "Variant_Survival/Characters/SDTAPlayerBase.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "NavigationSystem.h"
@@ -70,13 +70,13 @@ void ACommonEnemy::Tick(float DeltaTime)
 	}
 }
 
-ASDTAPlayer* ACommonEnemy::GetPlayerCharacter()
+ASDTAPlayerBase* ACommonEnemy::GetPlayerCharacter()
 {
 	// 获取玩家角色
 	APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(this, 0);
 	if (PlayerPawn)
 	{
-		return Cast<ASDTAPlayer>(PlayerPawn);
+		return Cast<ASDTAPlayerBase>(PlayerPawn);
 	}
 	return nullptr;
 }

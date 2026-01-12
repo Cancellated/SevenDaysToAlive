@@ -479,7 +479,7 @@ void ASDTAGameMode::BroadcastGameState()
 	if (CurrentTime - LastLogTime >= 1.0f)
 	{
 		// 输出游戏状态日志
-		UE_LOG(LogTemp, Log, TEXT("游戏状态更新：昼夜=%d, 天数=%d, 剩余时间=%.2f, 百分比=%.2f"), bIsNight, CurrentDay, RemainingTime, TimePercent);
+		// UE_LOG(LogTemp, Log, TEXT("游戏状态更新：昼夜=%d, 天数=%d, 剩余时间=%.2f, 百分比=%.2f"), bIsNight, CurrentDay, RemainingTime, TimePercent);
 		LastLogTime = CurrentTime;
 	}
 }

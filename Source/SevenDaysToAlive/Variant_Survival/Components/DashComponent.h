@@ -6,7 +6,7 @@
 #include "Components/ActorComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
-#include "Variant_Survival/Components/StaminaSystemComponent.h"
+#include "Variant_Survival/Components/StaminaComponent.h"
 #include "DashComponent.generated.h"
 
 
@@ -54,7 +54,7 @@ public:
 
 	// 耐力组件引用
 	UPROPERTY()
-	class UStaminaSystemComponent* StaminaComponent;
+	class UStaminaComponent* StaminaComponent;
 
 	// 网络复制相关
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
@@ -85,7 +85,7 @@ public:
 
 	// 初始化组件
 	UFUNCTION(BlueprintCallable, Category = "Dash")
-	void SetStaminaComponent(class UStaminaSystemComponent* InStaminaComponent);
+	void SetStaminaComponent(class UStaminaComponent* InStaminaComponent);
 
 private:
 	// 获取拥有者的角色移动组件

@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Variant_Survival/UI/Upgrade/SDTAUpgradeUIController.h"
-#include "Variant_Survival/Characters/SDTAPlayer.h"
+#include "Variant_Survival/Characters/SDTAPlayerBase.h"
 #include "Kismet/GameplayStatics.h"
 
 void USDTAUpgradeUIController::SetUpgradeOptions(TArray<USDTAUpgradeUIModel*> UpgradeOptions)

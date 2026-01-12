@@ -76,6 +76,7 @@ DerivedDataCache/*
 # Ignore third-party asset package
 /Content/Assets/
 /Content/Dark_Knight/
+/Content/ParagonMurdock/
 /doc/
 
 # VS Code

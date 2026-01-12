@@ -98,22 +98,35 @@ bool UDashComponent::CanDash() const
 {
 	if (bIsDashing)
 	{
+		UE_LOG(LogSevenDaysToAlive, Log, TEXT("[DashComponent] 不能冲刺: 已在冲刺中"));
 		return false;
 	}
 
 	float CurrentTime = GetWorld()->GetTimeSeconds();
-	if ((CurrentTime - LastDashTime) < DashCooldown)
+	float TimeSinceLastDash = CurrentTime - LastDashTime;
+	if (TimeSinceLastDash < DashCooldown)
 	{
+		UE_LOG(LogSevenDaysToAlive, Log, TEXT("[DashComponent] 不能冲刺: 冷却中 (%.2f < %.2f)"), TimeSinceLastDash, DashCooldown);
 		return false;
 	}
 
 	if (!StaminaComponent)
 	{
+		UE_LOG(LogSevenDaysToAlive, Log, TEXT("[DashComponent] 不能冲刺: 耐力组件无效"));
 		return false;
 	}
 
 	// 检查耐力是否足够
-	return StaminaComponent->Stamina >= DashStaminaCost;
+	float CurrentStamina = StaminaComponent->Stamina;
+	if (CurrentStamina < DashStaminaCost)
+	{
+		UE_LOG(LogSevenDaysToAlive, Log, TEXT("[DashComponent] 不能冲刺: 耐力不足 (%.2f < %.2f)"), CurrentStamina, DashStaminaCost);
+		return false;
+	}
+
+	UE_LOG(LogSevenDaysToAlive, Log, TEXT("[DashComponent] 可以冲刺: 耐力充足 (%.2f >= %.2f), 冷却结束 (%.2f >= %.2f)"), 
+		CurrentStamina, DashStaminaCost, TimeSinceLastDash, DashCooldown);
+	return true;
 }
 
 // 服务器端开始冲刺实现
@@ -124,18 +137,7 @@ void UDashComponent::Server_StartDash_Implementation()
 	// 检查是否可以冲刺
 	if (!CanDash())
 	{
-		if (bIsDashing)
-		{
-			UE_LOG(LogSevenDaysToAlive, Warning, TEXT("[DashComponent] 冲刺失败: 已在冲刺中"));
-		}
-		else if (!StaminaComponent)
-		{
-			UE_LOG(LogSevenDaysToAlive, Warning, TEXT("[DashComponent] 冲刺失败: 耐力组件无效"));
-		}
-		else
-		{
-			UE_LOG(LogSevenDaysToAlive, Warning, TEXT("[DashComponent] 冲刺失败: 耐力不足或冷却中"));
-		}
+		// UE_LOG(LogSevenDaysToAlive, Warning, TEXT("[DashComponent] 冲刺失败: 条件不满足"));
 		return;
 	}
 
@@ -210,7 +212,7 @@ bool UDashComponent::Server_EndDash_Validate()
 }
 
 // 初始化组件
-void UDashComponent::SetStaminaComponent(class UStaminaSystemComponent* InStaminaComponent)
+void UDashComponent::SetStaminaComponent(class UStaminaComponent* InStaminaComponent)
 {
 	StaminaComponent = InStaminaComponent;
 	UE_LOG(LogSevenDaysToAlive, Log, TEXT("[DashComponent] 组件已初始化，耐力组件: %s"), 

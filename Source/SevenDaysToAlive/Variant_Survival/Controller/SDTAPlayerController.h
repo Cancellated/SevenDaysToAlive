@@ -9,7 +9,7 @@
 #include "InputMappingContext.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/PlayerStart.h"
-#include "Variant_Survival/Characters/SDTAPlayer.h"
+#include "Variant_Survival/Characters/SDTAPlayerBase.h"
 #include "Variant_Survival/UI/SDTAPlayerHUD.h"
 #include "Variant_Survival/UI/SDTADebugUI.h"
 #include "Variant_Survival/UI/SDTAWeaponUI.h"
@@ -65,7 +65,7 @@ protected:
 
 	/** 角色类 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character", meta = (AllowPrivateAccess = "true"))
-	TSubclassOf<ASDTAPlayer> CharacterClass;
+	TSubclassOf<ASDTAPlayerBase> CharacterClass;
 
 	/** 玩家标签 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character", meta = (AllowPrivateAccess = "true"))
@@ -104,7 +104,7 @@ protected:
 
 public:
 	/** 获取当前控制的SDTA角色 */
-	ASDTAPlayer* GetControlledSDTAPlayer() const;
+	ASDTAPlayerBase* GetControlledSDTAPlayer() const;
 
 	/** 获取PlayerHUD实例 */
 	USDTAPlayerHUD* GetPlayerHUD() const;
@@ -115,4 +115,8 @@ public:
 	/** 显示击中反馈 */
 	UFUNCTION(BlueprintCallable, Category = "Weapon UI")
 	void ShowHitFeedback();
+
+	/** 处理冲刺输入 */
+	UFUNCTION()
+	void HandleDashInput();
 };
