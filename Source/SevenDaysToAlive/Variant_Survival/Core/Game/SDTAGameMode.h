@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameMode.h"
+#include "Variant_Survival/Core/Game/SDTAGameState.h"
+#include "Variant_Survival/Core/Game/SDTAPlayerState.h"
 #include "Variant_Survival/Enemies/AI/EnemyBase.h"
 #include "Variant_Survival/Core/Game/DayNight/SDTADayNightManager.h"
 #include "SDTAGameMode.generated.h"
@@ -34,6 +36,11 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+public:
+	// 获取GameState
+	UFUNCTION(BlueprintCallable, Category = "Game State")
+	ASDTAGameState* GetSDTAGameState() const;
 
 #pragma region 昼夜循环系统
 public:

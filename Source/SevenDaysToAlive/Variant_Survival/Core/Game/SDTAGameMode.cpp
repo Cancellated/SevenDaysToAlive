@@ -44,6 +44,12 @@
 #pragma region 构造函数和基础方法
 ASDTAGameMode::ASDTAGameMode()
 {
+	// 设置默认GameState类
+	GameStateClass = ASDTAGameState::StaticClass();
+	
+	// 设置默认PlayerState类
+	PlayerStateClass = ASDTAPlayerState::StaticClass();
+	
 	// 设置默认值
 	GameTime = 0.0f;
 	CurrentDay = 1;
@@ -124,6 +130,29 @@ void ASDTAGameMode::BeginPlay()
 		// 绑定昼夜管理器事件
 		DayNightManager->OnDayNightStateChanged.AddDynamic(this, &ASDTAGameMode::OnDayNightStateChanged);
 		DayNightManager->OnTimeUpdated.AddDynamic(this, &ASDTAGameMode::OnTimeUpdated);
+	}
+	
+	// 初始化GameState
+	ASDTAGameState* SDTAGameState = GetSDTAGameState();
+	if (SDTAGameState)
+	{
+		SDTAGameState->CurrentDay = 1;
+		SDTAGameState->bIsNight = false;
+		SDTAGameState->CurrentEnemyCount = 0;
+		SDTAGameState->MaxEnemyCount = MaxEnemyCount;
+		SDTAGameState->GlobalSoulFragments = 0;
+		SDTAGameState->TeamScore = 0;
+		SDTAGameState->bGameStarted = false;
+		SDTAGameState->bGameOver = false;
+		SDTAGameState->bVictory = false;
+
+		// 同步昼夜配置参数
+		SDTAGameState->DayLightIntensity = DayLightIntensity;
+		SDTAGameState->NightLightIntensity = NightLightIntensity;
+		SDTAGameState->DayLightColor = DayLightColor;
+		SDTAGameState->NightLightColor = NightLightColor;
+		SDTAGameState->DayAtmosphereColor = DayAtmosphereColor;
+		SDTAGameState->NightAtmosphereColor = NightAtmosphereColor;
 	}
 	
 	// 游戏开始逻辑
@@ -211,6 +240,7 @@ void ASDTAGameMode::CleanupDeadEnemies()
  * 功能：收集敌人掉落的灵魂碎片
  * 实现细节：
  * - 将收集到的碎片直接添加到可用灵魂碎片中
+ * - 同时更新GameState中的全局灵魂碎片
  * - 记录收集日志
  * 
  * @param Amount 收集的灵魂碎片数量
@@ -218,6 +248,13 @@ void ASDTAGameMode::CleanupDeadEnemies()
 void ASDTAGameMode::CollectSoulFragments(int32 Amount)
 {
 	SoulFragments += Amount;
+	
+	// 同时更新GameState
+	ASDTAGameState* SDTAGameState = GetSDTAGameState();
+	if (SDTAGameState)
+	{
+		SDTAGameState->GlobalSoulFragments += Amount;
+	}
 	
 	UE_LOG(LogTemp, Log, TEXT("收集了 %d 个灵魂碎片。可用数量：%d"), Amount, SoulFragments);
 }
@@ -302,6 +339,19 @@ USDTAPoolManager* ASDTAGameMode::GetPoolManager() const
 }
 
 /**
+ * 实现GetSDTAGameState方法
+ * 
+ * 功能：提供对GameState的安全访问接口
+ * 实现细节：将GameState转换为ASDTAGameState类型并返回
+ * 
+ * @return 返回ASDTAGameState实例，如果未初始化则返回nullptr
+ */
+ASDTAGameState* ASDTAGameMode::GetSDTAGameState() const
+{
+	return Cast<ASDTAGameState>(GameState);
+}
+
+/**
  * 实现GetDayNightManager方法
  * 
  * 功能：提供对昼夜管理器的安全访问接口
@@ -318,20 +368,32 @@ USDTADayNightManager* ASDTAGameMode::GetDayNightManager() const
  * 昼夜状态变化回调
  * 
  * 功能：处理昼夜管理器的状态变化事件
- * 实现细节：更新游戏模式的昼夜状态并广播游戏状态
+ * 实现细节：更新游戏模式和GameState的昼夜状态并广播游戏状态
  * 
  * @param bIsNowNight 当前是否为夜晚
  */
 void ASDTAGameMode::OnDayNightStateChanged(bool bIsNowNight)
 {
 	bIsNight = bIsNowNight;
+	
+	// 同时更新GameState
+	ASDTAGameState* SDTAGameState = GetSDTAGameState();
+	if (SDTAGameState)
+	{
+		SDTAGameState->bIsNight = bIsNowNight;
+		if (!bIsNowNight)
+		{
+			CurrentDay++;
+			SDTAGameState->CurrentDay = CurrentDay;
+		}
+	}
+	
 	if (bIsNowNight)
 	{
 		UE_LOG(LogTemp, Log, TEXT("夜晚阶段开始！第 %d 天"), CurrentDay);
 	}
 	else
 	{
-		CurrentDay++;
 		UE_LOG(LogTemp, Log, TEXT("白天阶段开始！第 %d 天"), CurrentDay);
 		// 分配灵魂碎片用于升级
 		DistributeSoulFragments();
@@ -375,6 +437,19 @@ void ASDTAGameMode::StartGame()
 	GameTime = 0.0f;
 	CurrentDay = 1;
 	bIsNight = false;
+	
+	// 同时更新GameState
+	ASDTAGameState* SDTAGameState = GetSDTAGameState();
+	if (SDTAGameState)
+	{
+		SDTAGameState->bGameStarted = true;
+		SDTAGameState->bGameOver = false;
+		SDTAGameState->bVictory = false;
+		SDTAGameState->GameTime = 0.0f;
+		SDTAGameState->CurrentDay = 1;
+		SDTAGameState->bIsNight = false;
+		SDTAGameState->GlobalSoulFragments = 0;
+	}
 	
 	// 分配初始灵魂碎片
 	DistributeSoulFragments();
@@ -445,6 +520,22 @@ void ASDTAGameMode::BroadcastGameState()
 	{
 		RemainingTime = DayNightManager->GetRemainingTime();
 		TimePercent = DayNightManager->GetTimePercent();
+	}
+	
+	// 同时更新GameState
+	ASDTAGameState* SDTAGameState = GetSDTAGameState();
+	if (SDTAGameState)
+	{
+		SDTAGameState->RemainingTime = RemainingTime;
+		SDTAGameState->TimePercent = TimePercent;
+		
+		// 同步过渡状态
+		if (DayNightManager)
+		{
+			SDTAGameState->bIsTransitioning = DayNightManager->IsTransitioning();
+			SDTAGameState->bTransitionToNight = DayNightManager->IsTransitioningToNight();
+			SDTAGameState->TransitionProgress = DayNightManager->GetTransitionProgress();
+		}
 	}
 	
 	// 遍历所有玩家控制器，更新他们的HUD

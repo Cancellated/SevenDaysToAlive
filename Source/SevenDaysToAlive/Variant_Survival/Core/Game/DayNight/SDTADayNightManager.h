@@ -134,6 +134,22 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Day Night System")
 	bool IsTransitioning() const;
+
+	/**
+	 * 是否过渡到夜晚
+	 * 
+	 * @return 是否过渡到夜晚
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Day Night System")
+	bool IsTransitioningToNight() const;
+
+	/**
+	 * 获取过渡进度
+	 * 
+	 * @return 过渡进度（0-1）
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Day Night System")
+	float GetTransitionProgress() const;
 	
 	/**
 	 * 获取世界中的光源列表

@@ -39,20 +39,19 @@ public:
     UPROPERTY(BlueprintReadWrite, Category = "SDTA HUD", Meta = (ExposeOnSpawn = true, DisplayName = "Max Stamina"))
     int32 MaxStamina = 100;
 
-protected:
-	/** 健康值百分比变化时的回调 */
-	UFUNCTION()
-	void OnHealthPercentChanged();
-
-	/** 能量值百分比变化时的回调 */
-	UFUNCTION()
-	void OnStaminaPercentChanged();
-
-	/** 时间百分比变化时的回调 */
-	UFUNCTION()
-	void OnTimePercentChanged();
-
 public:
+    /** 健康值百分比变化时的回调 */
+    UFUNCTION(BlueprintCallable, Category = "SDTA HUD")
+    void OnHealthPercentChanged();
+
+    /** 能量值百分比变化时的回调 */
+    UFUNCTION(BlueprintCallable, Category = "SDTA HUD")
+    void OnStaminaPercentChanged();
+
+    /** 时间百分比变化时的回调 */
+    UFUNCTION(BlueprintCallable, Category = "SDTA HUD")
+    void OnTimePercentChanged();
+
     /** 更新健康值显示 */
     UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "SDTA HUD")
     void BP_UpdateHealthBar(float InHealthPercent);
@@ -69,7 +68,6 @@ public:
     UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "SDTA HUD")
     void BP_ResetHUD();
 
-public:
     /** 当前是否为夜晚阶段 */
     UPROPERTY(BlueprintReadWrite, Category = "SDTA HUD", Meta = (ExposeOnSpawn = true, DisplayName = "Is Night"))
     bool bIsNight = false;

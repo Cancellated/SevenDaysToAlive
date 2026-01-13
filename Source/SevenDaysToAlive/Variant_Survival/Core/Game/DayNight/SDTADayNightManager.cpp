@@ -177,6 +177,16 @@ bool USDTADayNightManager::IsTransitioning() const
     return bIsTransitioning;
 }
 
+bool USDTADayNightManager::IsTransitioningToNight() const
+{
+    return bTransitionToNight;
+}
+
+float USDTADayNightManager::GetTransitionProgress() const
+{
+    return TransitionProgress;
+}
+
 TArray<class ULightComponent*> USDTADayNightManager::GetWorldLights(const FName& OptionalTag)
 {
     TArray<class ULightComponent*> Lights;

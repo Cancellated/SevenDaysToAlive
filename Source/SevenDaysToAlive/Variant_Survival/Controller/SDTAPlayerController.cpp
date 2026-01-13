@@ -9,8 +9,12 @@
 #include "GameFramework/PlayerStart.h"
 #include "Variant_Survival/Characters/SDTAPlayerBase.h"
 #include "Variant_Survival/Components/HealthComponent.h"
+#include "Variant_Survival/Core/Game/SDTAGameState.h"
+#include "Variant_Survival/Core/Game/SDTAPlayerState.h"
 #include "SevenDaysToAlive.h"
 #include "Widgets/Input/SVirtualJoystick.h"
+#include "Components/LightComponent.h"
+#include "Components/SkyAtmosphereComponent.h"
 
 // Sets default values
 ASDTAPlayerController::ASDTAPlayerController()
@@ -33,13 +37,12 @@ void ASDTAPlayerController::BeginPlay()
 		if (PlayerHUD)
 		{
 			PlayerHUD->AddToPlayerScreen(0);
+			UE_LOG(LogSevenDaysToAlive, Log, TEXT("玩家HUD已添加到视口"));
 		}
 		else
 		{
-			UE_LOG(LogSevenDaysToAlive, Error, TEXT("Could not spawn player HUD widget."));
+			UE_LOG(LogSevenDaysToAlive, Error, TEXT("无法创建玩家HUD"));
 		}
-
-		// 移动控件暂时不使用
 
 		// 初始化跟踪整数变量
 		LastHealthInt = -1;
@@ -54,10 +57,11 @@ void ASDTAPlayerController::BeginPlay()
 			if (DebugUIWidget)
 			{
 				DebugUIWidget->AddToPlayerScreen(1); // 放在更高层级，确保能看到
+				UE_LOG(LogSevenDaysToAlive, Log, TEXT("调试UI已添加到视口"));
 			}
 			else
 			{
-				UE_LOG(LogSevenDaysToAlive, Warning, TEXT("Could not spawn Debug UI widget."));
+				UE_LOG(LogSevenDaysToAlive, Warning, TEXT("无法创建调试UI"));
 			}
 		}
 
@@ -68,11 +72,11 @@ void ASDTAPlayerController::BeginPlay()
 			if (WeaponUI)
 			{
 				WeaponUI->AddToPlayerScreen(0); // 与HUD同一层级
-				UE_LOG(LogSevenDaysToAlive, Log, TEXT("Weapon UI created successfully"));
+				UE_LOG(LogSevenDaysToAlive, Log, TEXT("武器UI已添加到视口"));
 			}
 			else
 			{
-				UE_LOG(LogSevenDaysToAlive, Warning, TEXT("Could not spawn Weapon UI widget."));
+				UE_LOG(LogSevenDaysToAlive, Warning, TEXT("无法创建武器UI"));
 			}
 		}
 	}
@@ -119,109 +123,10 @@ void ASDTAPlayerController::HandleDashInput()
 void ASDTAPlayerController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
-
-	// subscribe to the pawn's OnDestroyed delegate
-	InPawn->OnDestroyed.AddDynamic(this, &ASDTAPlayerController::OnPawnDestroyed);
-
-	// 确保UI存在且可见
-	if (IsLocalPlayerController())
-	{
-		if (!PlayerHUD)
-		{
-			// 如果UI不存在，重新创建
-			PlayerHUD = CreateWidget<USDTAPlayerHUD>(this, PlayerHUDClass);
-			if (PlayerHUD)
-			{
-				PlayerHUD->AddToPlayerScreen(0);
-				UE_LOG(LogSevenDaysToAlive, Log, TEXT("HUD已添加到视口"));
-			}
-			else
-			{
-				UE_LOG(LogSevenDaysToAlive, Error, TEXT("无法创建玩家HUD"));
-			}
-		}
-		else if (!PlayerHUD->IsInViewport())
-		{
-			// 如果UI存在但不在视口中，重新添加
-			PlayerHUD->AddToPlayerScreen(0);
-			UE_LOG(LogSevenDaysToAlive, Log, TEXT("HUD已重新添加到视口"));
-		}
-
-		// 重新创建DebugUI（如果指定了UI类且不存在）
-		if (DebugUIWidgetClass && !DebugUIWidget)
-		{
-			DebugUIWidget = CreateWidget<USDTADebugUI>(this, DebugUIWidgetClass);
-			if (DebugUIWidget)
-			{
-				DebugUIWidget->AddToPlayerScreen(1);
-				UE_LOG(LogSevenDaysToAlive, Log, TEXT("Debug UI已重新创建"));
-			}
-		}
-
-		// 重新创建WeaponUI（如果指定了UI类且不存在）
-		if (WeaponUIWidgetClass && !WeaponUI)
-		{
-			WeaponUI = CreateWidget<USDTAWeaponUI>(this, WeaponUIWidgetClass);
-			if (WeaponUI)
-			{
-				WeaponUI->AddToPlayerScreen(0);
-				UE_LOG(LogSevenDaysToAlive, Log, TEXT("Weapon UI已重新创建"));
-			}
-		}
-	}
-
-	// is this a SDTA character?
-	if (ASDTAPlayerBase* SDTAPlayer = Cast<ASDTAPlayerBase>(InPawn))
-	{
-		// add the player tag
-		SDTAPlayer->Tags.Add(PlayerPawnTag);
-
-		// 绑定健康和死亡事件
-		SDTAPlayer->OnHealthChanged.AddDynamic(this, &ASDTAPlayerController::OnHealthChanged);
-		SDTAPlayer->OnDeath.AddDynamic(this, &ASDTAPlayerController::OnPawnDeath);
-
-		// 绑定耐力变化事件
-		SDTAPlayer->OnStaminaChanged.AddDynamic(this, &ASDTAPlayerController::OnStaminaChanged);
-
-		// 立即更新UI
-		if (SDTAPlayer->HealthComponent)
-		{
-			float HealthPercent = SDTAPlayer->HealthComponent->Health / SDTAPlayer->HealthComponent->MaxHealth;
-			SDTAPlayer->OnHealthChanged.Broadcast(HealthPercent);
-		}
-
-		// 立即更新耐力UI
-		if (SDTAPlayer->StaminaComponent)
-		{
-			float StaminaPercent = SDTAPlayer->StaminaComponent->Stamina / SDTAPlayer->StaminaComponent->MaxStamina;
-			SDTAPlayer->OnStaminaChanged.Broadcast(StaminaPercent);
-		}
-	}
 }
 
 void ASDTAPlayerController::OnUnPossess()
 {
-	// Get the pawn that was just unpossessed from the parameter
-	// Note: In Unreal Engine, GetPawn() may still return the pawn during OnUnPossess
-	// as the pawn is only cleared after this method returns
-	APawn* ControlledPawn = GetPawn();
-
-	// If we have a reference to the pawn
-	if (ControlledPawn)
-	{
-		// Unsubscribe from the pawn's OnDestroyed delegate
-		ControlledPawn->OnDestroyed.RemoveDynamic(this, &ASDTAPlayerController::OnPawnDestroyed);
-
-		// If it's a SDTA player character, unsubscribe from its delegates
-		if (ASDTAPlayerBase* SDTAPlayer = Cast<ASDTAPlayerBase>(ControlledPawn))
-		{
-			// 移除健康和死亡事件绑定
-			SDTAPlayer->OnHealthChanged.RemoveDynamic(this, &ASDTAPlayerController::OnHealthChanged);
-			SDTAPlayer->OnDeath.RemoveDynamic(this, &ASDTAPlayerController::OnPawnDeath);
-		}
-	}
-
-	// Call the parent class's OnUnPossess method
 	Super::OnUnPossess();
 }
 
@@ -231,70 +136,11 @@ void ASDTAPlayerController::OnUnPossess()
  */
 void ASDTAPlayerController::EndPlay(EEndPlayReason::Type EndPlayReason)
 {
-	// 获取当前拥有的pawn
-	APawn* ControlledPawn = GetPawn();
-
-	// 如果我们还拥有一个pawn，确保移除所有委托绑定
-	if (ControlledPawn)
-	{
-		// 移除OnDestroyed委托
-		ControlledPawn->OnDestroyed.RemoveDynamic(this, &ASDTAPlayerController::OnPawnDestroyed);
-
-		// 如果是SDTA玩家角色，移除所有相关委托
-		if (ASDTAPlayerBase* SDTAPlayer = Cast<ASDTAPlayerBase>(ControlledPawn))
-		{
-			// 移除健康和死亡事件绑定
-			SDTAPlayer->OnHealthChanged.RemoveDynamic(this, &ASDTAPlayerController::OnHealthChanged);
-			SDTAPlayer->OnDeath.RemoveDynamic(this, &ASDTAPlayerController::OnPawnDeath);
-			
-			// 移除耐力变化事件绑定
-			SDTAPlayer->OnStaminaChanged.RemoveDynamic(this, &ASDTAPlayerController::OnStaminaChanged);
-		}
-	}
-
 	// 调用父类的EndPlay方法
 	Super::EndPlay(EndPlayReason);
 }
 
-void ASDTAPlayerController::OnPawnDestroyed(AActor* DestroyedActor)
-{
-	// 重置UI元素
-	// 这里可以添加UI重置逻辑
 
-	// 无论控制器是否还拥有该pawn，只要它是SDTA玩家角色，就解绑所有委托
-		// 这确保了即使pawn在控制器不再拥有它后被销毁，委托也能被正确清理
-		if (ASDTAPlayerBase* SDTAPlayer = Cast<ASDTAPlayerBase>(DestroyedActor))
-		{
-			// 移除健康和死亡事件绑定
-			SDTAPlayer->OnHealthChanged.RemoveDynamic(this, &ASDTAPlayerController::OnHealthChanged);
-			SDTAPlayer->OnDeath.RemoveDynamic(this, &ASDTAPlayerController::OnPawnDeath);
-			
-			// 移除耐力变化事件绑定
-			SDTAPlayer->OnStaminaChanged.RemoveDynamic(this, &ASDTAPlayerController::OnStaminaChanged);
-			
-			// 移除OnDestroyed委托
-			SDTAPlayer->OnDestroyed.RemoveDynamic(this, &ASDTAPlayerController::OnPawnDestroyed);
-		}
-
-	// find the player start
-	TArray<AActor*> ActorList;
-	UGameplayStatics::GetAllActorsOfClass(GetWorld(), APlayerStart::StaticClass(), ActorList);
-
-	if (ActorList.Num() > 0)
-	{
-		// select a random player start
-		AActor* RandomPlayerStart = ActorList[FMath::RandRange(0, ActorList.Num() - 1)];
-
-		// spawn a character at the player start
-		const FTransform SpawnTransform = RandomPlayerStart->GetActorTransform();
-
-		if (ASDTAPlayerBase* RespawnedCharacter = GetWorld()->SpawnActor<ASDTAPlayerBase>(CharacterClass, SpawnTransform))
-		{
-			// possess the character
-			Possess(RespawnedCharacter);
-		}
-	}
-}
 
 void ASDTAPlayerController::OnHealthChanged(float HealthPercent)
 {
@@ -304,23 +150,23 @@ void ASDTAPlayerController::OnHealthChanged(float HealthPercent)
 		ASDTAPlayerBase* SDTAPlayer = GetControlledSDTAPlayer();
 		if (SDTAPlayer && SDTAPlayer->HealthComponent)
 		{
-			// 更新健康值百分比
+			// 强制更新健康值百分比
 			PlayerHUD->HealthPercent = HealthPercent;
 			
 			// 更新健康值文本显示
 			int32 CurrentHealthInt = FMath::RoundToInt(SDTAPlayer->HealthComponent->Health);
 			int32 MaxHealthInt = FMath::RoundToInt(SDTAPlayer->HealthComponent->MaxHealth);
 			
-			// 只有当值发生变化时才更新，避免不必要的UI刷新
-			if (CurrentHealthInt != LastHealthInt || MaxHealthInt != LastMaxHealthInt)
-			{
-				PlayerHUD->CurrentHealth = CurrentHealthInt;
-				PlayerHUD->MaxHealth = MaxHealthInt;
-				
-				// 更新跟踪变量
-				LastHealthInt = CurrentHealthInt;
-				LastMaxHealthInt = MaxHealthInt;
-			}
+			// 强制更新UI，不依赖于值的变化
+			PlayerHUD->CurrentHealth = CurrentHealthInt;
+			PlayerHUD->MaxHealth = MaxHealthInt;
+			
+			// 更新跟踪变量
+			LastHealthInt = CurrentHealthInt;
+			LastMaxHealthInt = MaxHealthInt;
+			
+			// 直接调用蓝图实现的更新方法，确保UI更新
+			PlayerHUD->BP_UpdateHealthBar(HealthPercent);
 		}
 	}
 }
@@ -333,23 +179,23 @@ void ASDTAPlayerController::OnStaminaChanged(float StaminaPercent)
 		ASDTAPlayerBase* SDTAPlayer = GetControlledSDTAPlayer();
 		if (SDTAPlayer && SDTAPlayer->StaminaComponent)
 		{
-			// 更新能量值百分比
+			// 强制更新能量值百分比
 			PlayerHUD->StaminaPercent = StaminaPercent;
 			
 			// 更新能量值文本显示
 			int32 CurrentStaminaInt = FMath::RoundToInt(SDTAPlayer->StaminaComponent->Stamina);
 			int32 MaxStaminaInt = FMath::RoundToInt(SDTAPlayer->StaminaComponent->MaxStamina);
 			
-			// 只有当值发生变化时才更新，避免不必要的UI刷新
-			if (CurrentStaminaInt != LastStaminaInt || MaxStaminaInt != LastMaxStaminaInt)
-			{
-				PlayerHUD->CurrentStamina = CurrentStaminaInt;
-				PlayerHUD->MaxStamina = MaxStaminaInt;
-				
-				// 更新跟踪变量
-				LastStaminaInt = CurrentStaminaInt;
-				LastMaxStaminaInt = MaxStaminaInt;
-			}
+			// 强制更新UI，不依赖于值的变化
+			PlayerHUD->CurrentStamina = CurrentStaminaInt;
+			PlayerHUD->MaxStamina = MaxStaminaInt;
+			
+			// 更新跟踪变量
+			LastStaminaInt = CurrentStaminaInt;
+			LastMaxStaminaInt = MaxStaminaInt;
+			
+			// 直接调用蓝图实现的更新方法，确保UI更新
+			PlayerHUD->BP_UpdateStaminaBar(StaminaPercent);
 		}
 	}
 }
@@ -380,11 +226,68 @@ void ASDTAPlayerController::Tick(float DeltaSeconds)
 			DebugUIWidget->UpdateSpeed(CurrentSpeed);
 		}
 	}
+
+	// 从GameState获取游戏状态数据并更新UI
+	if (PlayerHUD)
+	{
+		ASDTAGameState* GameState = GetSDTAGameState();
+		if (GameState)
+		{
+			// 更新昼夜和天数
+			PlayerHUD->bIsNight = GameState->bIsNight;
+			PlayerHUD->CurrentDay = GameState->CurrentDay;
+			PlayerHUD->RemainingTime = GameState->RemainingTime;
+			PlayerHUD->TimePercent = GameState->TimePercent;
+			
+			// 从PlayerState获取玩家个人数据
+			ASDTAPlayerState* SDTAPlayerState = GetSDTAPlayerState();
+			if (SDTAPlayerState)
+			{
+				// 更新玩家个人灵魂碎片显示
+				PlayerHUD->SoulFragments = SDTAPlayerState->PlayerSoulFragments;
+			}
+			else
+			{
+				// 如果没有PlayerState，使用全局灵魂碎片
+				PlayerHUD->SoulFragments = GameState->GlobalSoulFragments;
+			}
+			
+			// 触发UI更新
+			PlayerHUD->BP_UpdateDayNightCycle(GameState->bIsNight, GameState->CurrentDay, GameState->RemainingTime, GameState->TimePercent);
+			PlayerHUD->BP_UpdateSoulFragments();
+		}
+	}
+
+	// 客户端环境同步
+	if (IsLocalPlayerController())
+	{
+		UpdateClientEnvironment();
+	}
 }
 
 ASDTAPlayerBase* ASDTAPlayerController::GetControlledSDTAPlayer() const
 {
 	return Cast<ASDTAPlayerBase>(GetPawn());
+}
+
+/**
+ * 获取SDTA GameState
+ * 
+ * @return SDTA GameState实例
+ */
+ASDTAGameState* ASDTAPlayerController::GetSDTAGameState() const
+{
+	return GetWorld()->GetGameState<ASDTAGameState>();
+}
+
+/**
+ * 获取SDTA PlayerState
+ * 
+ * @return SDTA PlayerState实例
+ */
+ASDTAPlayerState* ASDTAPlayerController::GetSDTAPlayerState() const
+{
+	return Cast<ASDTAPlayerState>(PlayerState);
 }
 
 void ASDTAPlayerController::UpdateWeaponCounterUI(int32 CurrentAmmo, int32 MagazineSize)
@@ -406,6 +309,99 @@ void ASDTAPlayerController::ShowHitFeedback()
 }
 
 /**
+ * 开始本地计时
+ * 
+ * 功能：在客户端本地开始计时，用于昼夜循环进度条
+ * 实现细节：
+ * - 设置当前是否为夜晚阶段
+ * - 设置总持续时间
+ * - 重置已用时间
+ * - 输出调试日志
+ * 
+ * @param InIsNightPhase 是否为夜晚阶段
+ * @param TotalDuration 总持续时间（秒）
+ */
+void ASDTAPlayerController::StartLocalTiming(bool InIsNightPhase, float TotalDuration)
+{
+	// 设置本地计时变量
+	bIsNightPhase = InIsNightPhase;
+	this->TotalPhaseDuration = TotalDuration;
+	this->ElapsedPhaseTime = 0.0f;
+	
+	// 输出调试日志
+	UE_LOG(LogTemp, Log, TEXT("开始本地计时：%s，持续时间：%.2f秒"), InIsNightPhase ? TEXT("夜晚") : TEXT("白天"), TotalDuration);
+}
+
+/**
+ * 更新本地计时
+ * 
+ * 功能：每帧更新本地计时，用于昼夜循环进度条
+ * 实现细节：
+ * - 累加已用时间
+ * - 计算剩余时间和百分比
+ * - 更新HUD的属性
+ * - 触发UI更新
+ * 
+ * @param DeltaTime 每帧的时间间隔（秒）
+ */
+void ASDTAPlayerController::UpdateLocalTiming(float DeltaTime)
+{
+	// 如果总持续时间为0，直接返回
+	if (TotalPhaseDuration <= 0.0f)
+	{
+		return;
+	}
+	
+	// 累加已用时间，确保不超过总持续时间
+	ElapsedPhaseTime += DeltaTime;
+	ElapsedPhaseTime = FMath::Min(ElapsedPhaseTime, TotalPhaseDuration);
+	
+	// 计算剩余时间和百分比
+	float RemainingTime = GetRemainingTime();
+	float TimePercent = CalculateTimePercent();
+	
+	// 更新HUD的属性
+	if (PlayerHUD)
+	{
+		PlayerHUD->bIsNight = bIsNightPhase;
+		PlayerHUD->RemainingTime = RemainingTime;
+		PlayerHUD->TimePercent = TimePercent;
+		
+		// 手动触发属性变化回调，确保蓝图中的绑定能够更新
+		PlayerHUD->OnTimePercentChanged();
+	}
+}
+
+/**
+ * 计算剩余时间
+ * 
+ * 功能：计算当前阶段的剩余时间
+ * 
+ * @return 剩余时间（秒）
+ */
+float ASDTAPlayerController::GetRemainingTime() const
+{
+	return FMath::Max(0.0f, TotalPhaseDuration - ElapsedPhaseTime);
+}
+
+/**
+ * 计算时间百分比
+ * 
+ * 功能：计算当前阶段的时间百分比，用于进度条
+ * 
+ * @return 时间百分比（0.0-1.0）
+ */
+float ASDTAPlayerController::CalculateTimePercent() const
+{
+	if (TotalPhaseDuration <= 0.0f)
+	{
+		return 0.0f;
+	}
+	
+	return ElapsedPhaseTime / TotalPhaseDuration;
+}
+
+/**
  * 获取PlayerHUD实例
  * 
  * @return PlayerHUD实例指针
@@ -413,5 +409,117 @@ void ASDTAPlayerController::ShowHitFeedback()
 USDTAPlayerHUD* ASDTAPlayerController::GetPlayerHUD() const
 {
 	return PlayerHUD;
+}
+
+/**
+ * 客户端环境同步方法
+ * 用于在客户端根据GameState更新昼夜环境效果
+ */
+void ASDTAPlayerController::UpdateClientEnvironment()
+{
+	// 获取GameState
+	ASDTAGameState* GameState = GetSDTAGameState();
+	if (!GameState || !GetWorld())
+	{
+		return;
+	}
+
+	// 获取昼夜状态和过渡状态
+	bool bIsNight = GameState->bIsNight;
+	bool bIsTransitioning = GameState->bIsTransitioning;
+	bool bTransitionToNight = GameState->bTransitionToNight;
+	float TransitionProgress = GameState->TransitionProgress;
+
+	// 1. 更新光源
+	TArray<AActor*> LightActors;
+	UGameplayStatics::GetAllActorsWithTag(GetWorld(), FName("WorldLight"), LightActors);
+
+	// 从GameState获取光源配置
+	float DayLightIntensity = GameState->DayLightIntensity;
+	float NightLightIntensity = GameState->NightLightIntensity;
+	FLinearColor DayLightColor = GameState->DayLightColor;
+	FLinearColor NightLightColor = GameState->NightLightColor;
+
+	// 计算目标值
+	float TargetIntensity = DayLightIntensity;
+	FLinearColor TargetColor = DayLightColor;
+
+	if (bIsTransitioning)
+	{
+		// 过渡期间使用插值
+		float StartIntensity = bTransitionToNight ? DayLightIntensity : NightLightIntensity;
+		float EndIntensity = bTransitionToNight ? NightLightIntensity : DayLightIntensity;
+		FLinearColor StartColor = bTransitionToNight ? DayLightColor : NightLightColor;
+		FLinearColor EndColor = bTransitionToNight ? NightLightColor : DayLightColor;
+
+		TargetIntensity = FMath::Lerp(StartIntensity, EndIntensity, TransitionProgress);
+		TargetColor = FLinearColor::LerpUsingHSV(StartColor, EndColor, TransitionProgress);
+	}
+	else
+	{
+		// 非过渡期间直接使用目标值
+		TargetIntensity = bIsNight ? NightLightIntensity : DayLightIntensity;
+		TargetColor = bIsNight ? NightLightColor : DayLightColor;
+	}
+
+	// 更新所有光源
+	for (AActor* Actor : LightActors)
+	{
+		if (!Actor) continue;
+
+		TArray<ULightComponent*> LightComponents;
+		Actor->GetComponents<ULightComponent>(LightComponents);
+
+		for (ULightComponent* Light : LightComponents)
+		{
+			if (Light)
+			{
+				Light->SetIntensity(TargetIntensity);
+				Light->SetLightColor(TargetColor);
+			}
+		}
+	}
+
+	// 2. 更新大气效果
+	TArray<AActor*> AtmosphereActors;
+	UGameplayStatics::GetAllActorsWithTag(GetWorld(), FName("WorldAtmosphere"), AtmosphereActors);
+
+	// 从GameState获取大气配置
+	FLinearColor DayAtmosphereColor = GameState->DayAtmosphereColor;
+	FLinearColor NightAtmosphereColor = GameState->NightAtmosphereColor;
+
+	// 计算目标大气颜色
+	FLinearColor TargetAtmosphereColor = DayAtmosphereColor;
+
+	if (bIsTransitioning)
+	{
+		// 过渡期间使用插值
+		FLinearColor StartAtmosphereColor = bTransitionToNight ? DayAtmosphereColor : NightAtmosphereColor;
+		FLinearColor EndAtmosphereColor = bTransitionToNight ? NightAtmosphereColor : DayAtmosphereColor;
+
+		TargetAtmosphereColor = FLinearColor::LerpUsingHSV(StartAtmosphereColor, EndAtmosphereColor, TransitionProgress);
+	}
+	else
+	{
+		// 非过渡期间直接使用目标值
+		TargetAtmosphereColor = bIsNight ? NightAtmosphereColor : DayAtmosphereColor;
+	}
+
+	// 更新所有大气组件
+	for (AActor* Actor : AtmosphereActors)
+	{
+		if (!Actor) continue;
+
+		TArray<UActorComponent*> Components;
+		Actor->GetComponents(USkyAtmosphereComponent::StaticClass(), Components);
+
+		for (UActorComponent* Component : Components)
+		{
+			if (USkyAtmosphereComponent* AtmosphereComp = Cast<USkyAtmosphereComponent>(Component))
+			{
+				AtmosphereComp->RayleighScattering = TargetAtmosphereColor;
+			}
+		}
+	}
 }
 

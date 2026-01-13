@@ -47,9 +47,7 @@ protected:
 	/** 当Actor结束生命周期时调用 */
 	virtual void EndPlay(EEndPlayReason::Type EndPlayReason) override;
 
-	/** 角色被销毁时的回调 */
-	UFUNCTION()
-	void OnPawnDestroyed(AActor* DestroyedActor);
+	
 
 	/** 健康值变化时的回调 */
 	UFUNCTION()
@@ -101,6 +99,18 @@ protected:
 	int32 LastMaxHealthInt;
 	int32 LastStaminaInt;
 	int32 LastMaxStaminaInt;
+	
+	// 本地计时相关
+	bool bIsNightPhase = false;
+	float TotalPhaseDuration = 0.0f;
+	float ElapsedPhaseTime = 0.0f;
+	
+	// 更新本地计时
+	void UpdateLocalTiming(float DeltaTime);
+	
+	// 计算剩余时间和百分比
+	float GetRemainingTime() const;
+	float CalculateTimePercent() const;
 
 public:
 	/** 获取当前控制的SDTA角色 */
@@ -108,6 +118,14 @@ public:
 
 	/** 获取PlayerHUD实例 */
 	USDTAPlayerHUD* GetPlayerHUD() const;
+
+	/** 获取SDTA GameState */
+	UFUNCTION(BlueprintCallable, Category = "Game State")
+	class ASDTAGameState* GetSDTAGameState() const;
+
+	/** 获取SDTA PlayerState */
+	UFUNCTION(BlueprintCallable, Category = "Player State")
+	class ASDTAPlayerState* GetSDTAPlayerState() const;
 
 	/** 更新武器计数器UI */
 	void UpdateWeaponCounterUI(int32 CurrentAmmo, int32 MagazineSize);
@@ -119,4 +137,15 @@ public:
 	/** 处理冲刺输入 */
 	UFUNCTION()
 	void HandleDashInput();
+	
+	/** 开始本地计时 */
+	UFUNCTION(BlueprintCallable, Category = "SDTA Player")
+	void StartLocalTiming(bool InIsNightPhase, float TotalDuration);
+
+private:
+	/**
+	 * 客户端环境同步方法
+	 * 用于在客户端根据GameState更新昼夜环境效果
+	 */
+	void UpdateClientEnvironment();
 };
