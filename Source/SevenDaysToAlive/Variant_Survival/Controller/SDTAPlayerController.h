@@ -47,8 +47,6 @@ protected:
 	/** 当Actor结束生命周期时调用 */
 	virtual void EndPlay(EEndPlayReason::Type EndPlayReason) override;
 
-	
-
 	/** 健康值变化时的回调 */
 	UFUNCTION()
 	void OnHealthChanged(float HealthPercent);

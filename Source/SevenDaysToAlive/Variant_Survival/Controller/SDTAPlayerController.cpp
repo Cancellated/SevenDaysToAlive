@@ -79,6 +79,32 @@ void ASDTAPlayerController::BeginPlay()
 				UE_LOG(LogSevenDaysToAlive, Warning, TEXT("无法创建武器UI"));
 			}
 		}
+
+		// 绑定当前控制的角色的事件
+		ASDTAPlayerBase* SDTAPlayer = GetControlledSDTAPlayer();
+		if (SDTAPlayer)
+		{
+			// 绑定健康和死亡事件
+			SDTAPlayer->OnHealthChanged.AddDynamic(this, &ASDTAPlayerController::OnHealthChanged);
+			SDTAPlayer->OnDeath.AddDynamic(this, &ASDTAPlayerController::OnPawnDeath);
+
+			// 绑定耐力变化事件
+			SDTAPlayer->OnStaminaChanged.AddDynamic(this, &ASDTAPlayerController::OnStaminaChanged);
+
+			// 立即更新UI
+			if (SDTAPlayer->HealthComponent)
+			{
+				float HealthPercent = SDTAPlayer->HealthComponent->Health / SDTAPlayer->HealthComponent->MaxHealth;
+				SDTAPlayer->OnHealthChanged.Broadcast(HealthPercent);
+			}
+
+			// 立即更新耐力UI
+			if (SDTAPlayer->StaminaComponent)
+			{
+				float StaminaPercent = SDTAPlayer->StaminaComponent->Stamina / SDTAPlayer->StaminaComponent->MaxStamina;
+				SDTAPlayer->OnStaminaChanged.Broadcast(StaminaPercent);
+			}
+		}
 	}
 }
 
