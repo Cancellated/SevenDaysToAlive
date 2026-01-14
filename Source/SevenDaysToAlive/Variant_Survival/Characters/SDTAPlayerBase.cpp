@@ -7,6 +7,7 @@
 #include "Variant_Survival/Components/DashComponent.h"
 #include "EnhancedInputComponent.h"
 #include "InputAction.h"
+#include "SevenDaysToAlive.h"
 
 // 设置默认值
 ASDTAPlayerBase::ASDTAPlayerBase()
@@ -150,6 +151,7 @@ void ASDTAPlayerBase::OnHealthComponentDeath()
 /** 耐力值变化回调 */
 void ASDTAPlayerBase::OnStaminaComponentChanged(float StaminaPercent)
 {
+	// UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAPlayerBase] 耐力值变化回调，百分比: %.2f, 广播事件"), StaminaPercent);
 	// 广播耐力值变化委托
 	OnStaminaChanged.Broadcast(StaminaPercent);
 }

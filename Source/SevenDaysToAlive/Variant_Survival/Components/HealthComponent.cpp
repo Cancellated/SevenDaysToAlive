@@ -1,12 +1,16 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "HealthComponent.h"
+#include "SevenDaysToAlive.h"
 
 // Sets default values for this component's properties
 UHealthComponent::UHealthComponent()
 {
     // Set this component to be initialized when the game starts, and to be ticked every frame.
     PrimaryComponentTick.bCanEverTick = true;
+
+    // 启用组件的网络复制
+    SetIsReplicated(true);
 
     // 设置默认健康值
     MaxHealth = 100.0f;
@@ -68,4 +72,25 @@ void UHealthComponent::RemoveHealth(float HealthToRemove)
 bool UHealthComponent::IsDead() const
 {
     return Health <= 0.0f;
+}
+
+// 实现网络复制属性配置
+void UHealthComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+    
+    // 复制最大健康值和当前健康值
+    DOREPLIFETIME(UHealthComponent, MaxHealth);
+    DOREPLIFETIME(UHealthComponent, Health);
+}
+
+// 当Health属性在网络上复制时调用
+void UHealthComponent::OnRep_Health()
+{
+    // 计算健康值百分比
+    float HealthPercent = MaxHealth > 0.0f ? Health / MaxHealth : 0.0f;
+    UE_LOG(LogSevenDaysToAlive, Log, TEXT("[HealthComponent] 网络复制回调，当前健康值: %.2f, 最大健康值: %.2f, 百分比: %.2f, 广播事件"), Health, MaxHealth, HealthPercent);
+    
+    // 广播健康值变化事件
+    OnHealthChanged.Broadcast(HealthPercent);
 }

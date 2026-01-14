@@ -32,7 +32,7 @@ public:
     float MaxStamina;
 
     // 当前能量值
-    UPROPERTY(BlueprintReadWrite, Replicated, Category = "Stamina System")
+    UPROPERTY(BlueprintReadWrite, ReplicatedUsing = OnRep_Stamina, Category = "Stamina System")
     float Stamina;
 
     // 能量回复相关属性
@@ -79,4 +79,8 @@ public:
 
     // 网络复制相关
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+    // 当Stamina属性在网络上复制时调用
+    UFUNCTION()
+    void OnRep_Stamina();
 };

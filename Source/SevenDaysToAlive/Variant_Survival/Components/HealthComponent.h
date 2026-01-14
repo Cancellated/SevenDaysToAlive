@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Net/UnrealNetwork.h" // 添加网络相关头文件
 #include "HealthComponent.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHealthChangedComponent, float, HealthPercent);
@@ -28,11 +29,11 @@ public:
     virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
     // 角色统计属性
-    UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Health System")
+    UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Replicated, Category = "Health System")
     float MaxHealth;
 
     // 当前健康值
-    UPROPERTY(BlueprintReadWrite, Category = "Health System")
+    UPROPERTY(BlueprintReadWrite, ReplicatedUsing = OnRep_Health, Category = "Health System")
     float Health;
 
     // 健康值变化委托
@@ -62,4 +63,11 @@ public:
     // 检查是否死亡
     UFUNCTION(BlueprintCallable, Category = "Health System")
     bool IsDead() const;
+
+    // 网络复制相关
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+    // 当Health属性在网络上复制时调用
+    UFUNCTION()
+    void OnRep_Health();
 };

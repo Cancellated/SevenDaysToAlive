@@ -2,19 +2,23 @@
 
 #include "Variant_Survival/Components/StaminaComponent.h"
 #include "TimerManager.h"
+#include "SevenDaysToAlive.h"
 
 // Sets default values for this component's properties
 UStaminaComponent::UStaminaComponent()
 {
-    // Set this component to be initialized when the game starts, and to be ticked every frame.
-    PrimaryComponentTick.bCanEverTick = true;
+	// Set this component to be initialized when the game starts, and to be ticked every frame.
+	PrimaryComponentTick.bCanEverTick = true;
 
-    // 设置默认能量值
-    MaxStamina = 100.0f;
-    Stamina = MaxStamina;
-    StaminaRegenerationRate = 5.0f;
-    StaminaRegenerationDelay = 2.0f;
-    bIsStaminaRegenerating = false;
+	// 启用组件的网络复制
+	SetIsReplicated(true);
+
+	// 设置默认能量值
+	MaxStamina = 100.0f;
+	Stamina = MaxStamina;
+	StaminaRegenerationRate = 5.0f;
+	StaminaRegenerationDelay = 2.0f;
+	bIsStaminaRegenerating = false;
 }
 
 // Called when the game starts
@@ -36,13 +40,12 @@ void UStaminaComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAct
     if (bIsStaminaRegenerating && Stamina < MaxStamina)
     {
         float OldStamina = Stamina;
-        Stamina = FMath::Clamp(Stamina + (StaminaRegenerationRate * DeltaTime), 0.0f, MaxStamina);
-
-        // 如果能量值发生变化，广播事件
-        if (FMath::Abs(Stamina - OldStamina) > 0.01f)
+        float NewStamina = FMath::Clamp(Stamina + (StaminaRegenerationRate * DeltaTime), 0.0f, MaxStamina);
+        
+        // 更新耐力值
+        if (NewStamina != OldStamina)
         {
-            float StaminaPercent = MaxStamina > 0.0f ? Stamina / MaxStamina : 0.0f;
-            OnStaminaChanged.Broadcast(StaminaPercent);
+            SetStamina(NewStamina);
         }
     }
 }
@@ -50,18 +53,19 @@ void UStaminaComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAct
 // 设置能量值
 void UStaminaComponent::SetStamina(float NewStamina)
 {
-    float OldStamina = Stamina;
-    Stamina = FMath::Clamp(NewStamina, 0.0f, MaxStamina);
+	float OldStamina = Stamina;
+	Stamina = FMath::Clamp(NewStamina, 0.0f, MaxStamina);
 
-    // 广播能量值变化
-    float StaminaPercent = MaxStamina > 0.0f ? Stamina / MaxStamina : 0.0f;
-    OnStaminaChanged.Broadcast(StaminaPercent);
+	// 广播能量值变化
+	float StaminaPercent = MaxStamina > 0.0f ? Stamina / MaxStamina : 0.0f;
+	// UE_LOG(LogSevenDaysToAlive, Log, TEXT("[StaminaComponent] 设置耐力值，旧值: %.2f, 新值: %.2f, 百分比: %.2f, 广播事件"), OldStamina, Stamina, StaminaPercent);
+	OnStaminaChanged.Broadcast(StaminaPercent);
 
-    // 检查是否为低能量值
-    if (Stamina < MaxStamina * 0.3f && OldStamina >= MaxStamina * 0.3f)
-    {
-        OnStaminaLowWarning.Broadcast();
-    }
+	// 检查是否为低能量值
+	if (Stamina < MaxStamina * 0.3f && OldStamina >= MaxStamina * 0.3f)
+	{
+		OnStaminaLowWarning.Broadcast();
+	}
 }
 
 // 增加能量值
@@ -110,4 +114,15 @@ void UStaminaComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
     
     // 复制体力回复状态
     DOREPLIFETIME(UStaminaComponent, bIsStaminaRegenerating);
+}
+
+// 当Stamina属性在网络上复制时调用
+void UStaminaComponent::OnRep_Stamina()
+{
+    // 计算耐力值百分比
+    float StaminaPercent = MaxStamina > 0.0f ? Stamina / MaxStamina : 0.0f;
+    // UE_LOG(LogSevenDaysToAlive, Log, TEXT("[StaminaComponent] 网络复制回调，当前耐力: %.2f, 最大耐力: %.2f, 百分比: %.2f, 广播事件"), Stamina, MaxStamina, StaminaPercent);
+    
+    // 广播耐力值变化事件
+    OnStaminaChanged.Broadcast(StaminaPercent);
 }

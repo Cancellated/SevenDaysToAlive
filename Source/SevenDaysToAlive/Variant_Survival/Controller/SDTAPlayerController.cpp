@@ -80,31 +80,43 @@ void ASDTAPlayerController::BeginPlay()
 			}
 		}
 
-		// 绑定当前控制的角色的事件
-		ASDTAPlayerBase* SDTAPlayer = GetControlledSDTAPlayer();
-		if (SDTAPlayer)
+		// 延迟一帧绑定事件，确保角色已经被控制器接管
+		GetWorld()->GetTimerManager().SetTimerForNextTick([this]()
 		{
-			// 绑定健康和死亡事件
-			SDTAPlayer->OnHealthChanged.AddDynamic(this, &ASDTAPlayerController::OnHealthChanged);
-			SDTAPlayer->OnDeath.AddDynamic(this, &ASDTAPlayerController::OnPawnDeath);
-
-			// 绑定耐力变化事件
-			SDTAPlayer->OnStaminaChanged.AddDynamic(this, &ASDTAPlayerController::OnStaminaChanged);
-
-			// 立即更新UI
-			if (SDTAPlayer->HealthComponent)
+			// 绑定当前控制的角色的事件
+			ASDTAPlayerBase* SDTAPlayer = GetControlledSDTAPlayer();
+			if (SDTAPlayer)
 			{
-				float HealthPercent = SDTAPlayer->HealthComponent->Health / SDTAPlayer->HealthComponent->MaxHealth;
-				SDTAPlayer->OnHealthChanged.Broadcast(HealthPercent);
-			}
+				UE_LOG(LogSevenDaysToAlive, Log, TEXT("绑定角色事件，角色: %s"), *SDTAPlayer->GetName());
 
-			// 立即更新耐力UI
-			if (SDTAPlayer->StaminaComponent)
-			{
-				float StaminaPercent = SDTAPlayer->StaminaComponent->Stamina / SDTAPlayer->StaminaComponent->MaxStamina;
-				SDTAPlayer->OnStaminaChanged.Broadcast(StaminaPercent);
+				// 绑定健康和死亡事件
+				SDTAPlayer->OnHealthChanged.AddDynamic(this, &ASDTAPlayerController::OnHealthChanged);
+				SDTAPlayer->OnDeath.AddDynamic(this, &ASDTAPlayerController::OnPawnDeath);
+
+				// 绑定耐力变化事件
+				SDTAPlayer->OnStaminaChanged.AddDynamic(this, &ASDTAPlayerController::OnStaminaChanged);
+
+				// 立即更新UI
+				if (SDTAPlayer->HealthComponent)
+				{
+					float HealthPercent = SDTAPlayer->HealthComponent->Health / SDTAPlayer->HealthComponent->MaxHealth;
+					SDTAPlayer->OnHealthChanged.Broadcast(HealthPercent);
+					UE_LOG(LogSevenDaysToAlive, Log, TEXT("初始化健康值UI，百分比: %.2f"), HealthPercent);
+				}
+
+				// 立即更新耐力UI
+				if (SDTAPlayer->StaminaComponent)
+				{
+					float StaminaPercent = SDTAPlayer->StaminaComponent->Stamina / SDTAPlayer->StaminaComponent->MaxStamina;
+					SDTAPlayer->OnStaminaChanged.Broadcast(StaminaPercent);
+					UE_LOG(LogSevenDaysToAlive, Log, TEXT("初始化耐力值UI，百分比: %.2f"), StaminaPercent);
+				}
 			}
-		}
+			else
+			{
+				UE_LOG(LogSevenDaysToAlive, Warning, TEXT("无法绑定角色事件，没有控制的角色"));
+			}
+		});
 	}
 }
 
@@ -146,15 +158,7 @@ void ASDTAPlayerController::HandleDashInput()
 	}
 }
 
-void ASDTAPlayerController::OnPossess(APawn* InPawn)
-{
-	Super::OnPossess(InPawn);
-}
 
-void ASDTAPlayerController::OnUnPossess()
-{
-	Super::OnUnPossess();
-}
 
 /**
  * 当Actor结束生命周期时调用，用于清理资源和委托
@@ -170,58 +174,76 @@ void ASDTAPlayerController::EndPlay(EEndPlayReason::Type EndPlayReason)
 
 void ASDTAPlayerController::OnHealthChanged(float HealthPercent)
 {
+	// 确保只在本地播放器控制器上更新UI
+	if (!IsLocalPlayerController())
+	{
+		return;
+	}
+
 	// 更新健康值UI
 	if (PlayerHUD)
 	{
 		ASDTAPlayerBase* SDTAPlayer = GetControlledSDTAPlayer();
 		if (SDTAPlayer && SDTAPlayer->HealthComponent)
 		{
-			// 强制更新健康值百分比
+			// 更新健康值百分比
 			PlayerHUD->HealthPercent = HealthPercent;
 			
 			// 更新健康值文本显示
 			int32 CurrentHealthInt = FMath::RoundToInt(SDTAPlayer->HealthComponent->Health);
 			int32 MaxHealthInt = FMath::RoundToInt(SDTAPlayer->HealthComponent->MaxHealth);
 			
-			// 强制更新UI，不依赖于值的变化
-			PlayerHUD->CurrentHealth = CurrentHealthInt;
-			PlayerHUD->MaxHealth = MaxHealthInt;
-			
-			// 更新跟踪变量
-			LastHealthInt = CurrentHealthInt;
-			LastMaxHealthInt = MaxHealthInt;
-			
-			// 直接调用蓝图实现的更新方法，确保UI更新
-			PlayerHUD->BP_UpdateHealthBar(HealthPercent);
+			// 只在值发生变化时更新，避免重复更新
+			if (CurrentHealthInt != LastHealthInt || MaxHealthInt != LastMaxHealthInt)
+			{
+				PlayerHUD->CurrentHealth = CurrentHealthInt;
+				PlayerHUD->MaxHealth = MaxHealthInt;
+				
+				// 标记UI为需要更新
+				PlayerHUD->InvalidateLayoutAndVolatility();
+				
+				// 更新跟踪变量
+				LastHealthInt = CurrentHealthInt;
+				LastMaxHealthInt = MaxHealthInt;
+			}
 		}
 	}
 }
 
 void ASDTAPlayerController::OnStaminaChanged(float StaminaPercent)
 {
+	// 确保只在本地播放器控制器上更新UI
+	if (!IsLocalPlayerController())
+	{
+		return;
+	}
+
 	// 更新能量值UI
 	if (PlayerHUD)
 	{
 		ASDTAPlayerBase* SDTAPlayer = GetControlledSDTAPlayer();
 		if (SDTAPlayer && SDTAPlayer->StaminaComponent)
 		{
-			// 强制更新能量值百分比
+			// 更新能量值百分比
 			PlayerHUD->StaminaPercent = StaminaPercent;
 			
 			// 更新能量值文本显示
 			int32 CurrentStaminaInt = FMath::RoundToInt(SDTAPlayer->StaminaComponent->Stamina);
 			int32 MaxStaminaInt = FMath::RoundToInt(SDTAPlayer->StaminaComponent->MaxStamina);
 			
-			// 强制更新UI，不依赖于值的变化
-			PlayerHUD->CurrentStamina = CurrentStaminaInt;
-			PlayerHUD->MaxStamina = MaxStaminaInt;
-			
-			// 更新跟踪变量
-			LastStaminaInt = CurrentStaminaInt;
-			LastMaxStaminaInt = MaxStaminaInt;
-			
-			// 直接调用蓝图实现的更新方法，确保UI更新
-			PlayerHUD->BP_UpdateStaminaBar(StaminaPercent);
+			// 只在值发生变化时更新，避免重复更新
+			if (CurrentStaminaInt != LastStaminaInt || MaxStaminaInt != LastMaxStaminaInt)
+			{
+				PlayerHUD->CurrentStamina = CurrentStaminaInt;
+				PlayerHUD->MaxStamina = MaxStaminaInt;
+				
+				// 标记UI为需要更新
+				PlayerHUD->InvalidateLayoutAndVolatility();
+				
+				// 更新跟踪变量
+				LastStaminaInt = CurrentStaminaInt;
+				LastMaxStaminaInt = MaxStaminaInt;
+			}
 		}
 	}
 }

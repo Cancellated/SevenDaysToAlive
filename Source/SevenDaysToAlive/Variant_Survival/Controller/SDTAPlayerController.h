@@ -38,11 +38,7 @@ protected:
 	/** 每帧调用一次 */
 	virtual void Tick(float DeltaSeconds) override;
 
-	/** 接管角色时调用 */
-	virtual void OnPossess(APawn* InPawn) override;
-
-	/** 释放角色时调用 */
-	virtual void OnUnPossess() override;
+	
 
 	/** 当Actor结束生命周期时调用 */
 	virtual void EndPlay(EEndPlayReason::Type EndPlayReason) override;
