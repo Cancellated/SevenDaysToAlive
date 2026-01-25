@@ -84,6 +84,13 @@ void ASDTAPlayerBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 			EnhancedInputComponent->BindAction(DashAction, ETriggerEvent::Started, this, &ASDTAPlayerBase::DoDashStart);
 			UE_LOG(LogTemp, Log, TEXT("冲刺输入绑定成功"));
 		}
+
+		// 添加开火输入绑定
+		if (FireAction)
+		{
+			EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Started, this, &ASDTAPlayerBase::DoFireStart);
+			UE_LOG(LogTemp, Log, TEXT("开火输入绑定成功"));
+		}
 	}
 }
 
@@ -132,6 +139,14 @@ void ASDTAPlayerBase::DoDashStart()
 		// 开始冲刺
 		DashComponent->StartDash();
 	}
+}
+
+/** 处理开火输入 */
+void ASDTAPlayerBase::DoFireStart()
+{
+	// 这里可以添加开火逻辑
+	// 例如：检查武器是否装备，消耗弹药，播放开火动画，生成子弹等
+	UE_LOG(LogTemp, Log, TEXT("开火输入触发"));
 }
 
 /** 健康值变化回调 */

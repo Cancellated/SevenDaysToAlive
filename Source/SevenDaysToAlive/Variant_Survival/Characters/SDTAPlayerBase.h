@@ -34,6 +34,10 @@ protected:
 	UPROPERTY(EditAnywhere, Category ="Input")
 	UInputAction* DashAction;
 
+	/** 开火输入动作 */
+	UPROPERTY(EditAnywhere, Category ="Input")
+	UInputAction* FireAction;
+
 protected:
 	/** 游戏开始时调用 */
 	virtual void BeginPlay() override;
@@ -59,6 +63,9 @@ public:
 
 	/** 处理冲刺输入 */
 	virtual void DoDashStart();
+
+	/** 处理开火输入 */
+	virtual void DoFireStart();
 
 	/** 当Actor结束生命周期时调用 */
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
