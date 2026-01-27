@@ -31,10 +31,10 @@ public class SevenDaysToAlive : ModuleRules
 			"SevenDaysToAlive/Variant_Shooter/AI",
 			"SevenDaysToAlive/Variant_Shooter/UI",
 			"SevenDaysToAlive/Variant_Shooter/Weapons",
-			"SevenDaysToAlive/Variant_Survival",
-			"SevenDaysToAlive/Variant_Survival/Core",
-			"SevenDaysToAlive/Variant_Survival/Core/Game",
-			"SevenDaysToAlive/Variant_Survival/Enemies/AI"
+			"SevenDaysToAlive/Variant_SDTA",
+			"SevenDaysToAlive/Variant_SDTA/Core",
+			"SevenDaysToAlive/Variant_SDTA/Core/Game",
+			"SevenDaysToAlive/Variant_SDTA/Enemies/AI"
 		});
 
 		// Uncomment if you are using Slate UI
