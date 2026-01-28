@@ -89,11 +89,13 @@ protected:
 	/** 处理碰撞 */
 	virtual void NotifyHit(class UPrimitiveComponent* MyComp, AActor* Other, UPrimitiveComponent* OtherComp, bool bSelfMoved, FVector HitLocation, FVector HitNormal, FVector NormalImpulse, const FHitResult& Hit) override;
 
-protected:
+public:
 
 	/** 激活子弹 */
 	UFUNCTION(BlueprintCallable, Category="Bullet")
 	void ActivateBullet(const FVector& Direction);
+
+protected:
 
 	/** 爆炸检查 */
 	void ExplosionCheck(const FVector& ExplosionCenter);
@@ -121,17 +123,61 @@ public:
 
 	/** 设置子弹伤害 */
 	UFUNCTION(BlueprintCallable, Category="Bullet")
-	void SetDamage(float NewDamage);
+	void SetBulletDamage(float NewDamage);
+
+	/** 获取子弹伤害 */
+	UFUNCTION(BlueprintPure, Category="Bullet")
+	float GetBulletDamage() const;
 
 	/** 设置子弹射程 */
 	UFUNCTION(BlueprintCallable, Category="Bullet")
-	void SetRange(float NewRange);
+	void SetBulletRange(float NewRange);
+
+	/** 获取子弹射程 */
+	UFUNCTION(BlueprintPure, Category="Bullet")
+	float GetBulletRange() const;
 
 	/** 设置子弹速度 */
 	UFUNCTION(BlueprintCallable, Category="Bullet")
-	void SetVelocity(float NewVelocity);
+	void SetBulletVelocity(float NewVelocity);
+
+	/** 获取子弹速度 */
+	UFUNCTION(BlueprintPure, Category="Bullet")
+	float GetBulletVelocity() const;
 
 	/** 设置子弹生命周期 */
 	UFUNCTION(BlueprintCallable, Category="Bullet")
-	void SetLifetime(float NewLifetime);
+	void SetBulletLifetime(float NewLifetime);
+
+	/** 获取子弹生命周期 */
+	UFUNCTION(BlueprintPure, Category="Bullet")
+	float GetBulletLifetime() const;
+
+	/** 获取子弹伤害类型 */
+	UFUNCTION(BlueprintPure, Category="Bullet")
+	TSubclassOf<UDamageType> GetBulletDamageType() const;
+
+	/** 获取是否伤害所有者 */
+	UFUNCTION(BlueprintPure, Category="Bullet")
+	bool IsBulletDamageOwner() const;
+
+	/** 获取是否在碰撞时爆炸 */
+	UFUNCTION(BlueprintPure, Category="Bullet")
+	bool IsBulletExplodeOnHit() const;
+
+	/** 获取爆炸半径 */
+	UFUNCTION(BlueprintPure, Category="Bullet")
+	float GetBulletExplosionRadius() const;
+
+	/** 获取物理冲击力 */
+	UFUNCTION(BlueprintPure, Category="Bullet")
+	float GetBulletPhysicsForce() const;
+
+	/** 获取碰撞组件 */
+	UFUNCTION(BlueprintPure, Category="Bullet")
+	USphereComponent* GetBulletCollisionComponent() const;
+
+	/** 获取弹丸移动组件 */
+	UFUNCTION(BlueprintPure, Category="Bullet")
+	UProjectileMovementComponent* GetBulletProjectileMovement() const;
 };

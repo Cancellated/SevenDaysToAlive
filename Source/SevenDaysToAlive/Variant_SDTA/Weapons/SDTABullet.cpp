@@ -29,8 +29,8 @@ ASDTABullet::ASDTABullet()
 	// 创建弹丸移动组件
 	ProjectileMovement = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("Projectile Movement"));
 
-	ProjectileMovement->InitialSpeed = Velocity;
-	ProjectileMovement->MaxSpeed = Velocity;
+	ProjectileMovement->InitialSpeed = GetBulletVelocity();
+	ProjectileMovement->MaxSpeed = GetBulletVelocity();
 	ProjectileMovement->bShouldBounce = false;
 
 	// 设置默认伤害类型
@@ -45,7 +45,7 @@ void ASDTABullet::BeginPlay()
 	CollisionComponent->IgnoreActorWhenMoving(GetInstigator(), true);
 
 	// 设置生命周期定时器
-	GetWorld()->GetTimerManager().SetTimer(LifetimeTimer, this, &ASDTABullet::OnLifetimeEnd, Lifetime, false);
+	GetWorld()->GetTimerManager().SetTimer(LifetimeTimer, this, &ASDTABullet::OnLifetimeEnd, GetBulletLifetime(), false);
 }
 
 void ASDTABullet::EndPlay(EEndPlayReason::Type EndPlayReason)
@@ -70,7 +70,7 @@ void ASDTABullet::NotifyHit(class UPrimitiveComponent* MyComp, AActor* Other, cl
 	// 禁用碰撞
 	CollisionComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-	if (bExplodeOnHit)
+	if (IsBulletExplodeOnHit())
 	{
 		// 应用爆炸伤害
 		ExplosionCheck(GetActorLocation());
@@ -106,12 +106,12 @@ void ASDTABullet::ActivateBullet(const FVector& Direction)
 	GetWorld()->GetTimerManager().ClearTimer(LifetimeTimer);
 
 	// 重新设置生命周期定时器
-	GetWorld()->GetTimerManager().SetTimer(LifetimeTimer, this, &ASDTABullet::OnLifetimeEnd, Lifetime, false);
+	GetWorld()->GetTimerManager().SetTimer(LifetimeTimer, this, &ASDTABullet::OnLifetimeEnd, GetBulletLifetime(), false);
 
 	// 设置弹丸移动方向
 	if (ProjectileMovement)
 	{
-		ProjectileMovement->Velocity = Direction * Velocity;
+		ProjectileMovement->Velocity = Direction * GetBulletVelocity();
 	}
 
 	// 启用碰撞
@@ -129,7 +129,7 @@ void ASDTABullet::ResetBulletState()
 	GetWorld()->GetTimerManager().ClearTimer(LifetimeTimer);
 
 	// 重新设置生命周期定时器
-	GetWorld()->GetTimerManager().SetTimer(LifetimeTimer, this, &ASDTABullet::OnLifetimeEnd, Lifetime, false);
+	GetWorld()->GetTimerManager().SetTimer(LifetimeTimer, this, &ASDTABullet::OnLifetimeEnd, GetBulletLifetime(), false);
 }
 
 void ASDTABullet::ExplosionCheck(const FVector& ExplosionCenter)
@@ -138,7 +138,7 @@ void ASDTABullet::ExplosionCheck(const FVector& ExplosionCenter)
 	TArray<FOverlapResult> Overlaps;
 
 	FCollisionShape OverlapShape;
-	OverlapShape.SetSphere(ExplosionRadius);
+	OverlapShape.SetSphere(GetBulletExplosionRadius());
 
 	FCollisionObjectQueryParams ObjectParams;
 	ObjectParams.AddObjectTypesToQuery(ECC_Pawn);
@@ -147,7 +147,7 @@ void ASDTABullet::ExplosionCheck(const FVector& ExplosionCenter)
 
 	FCollisionQueryParams QueryParams;
 	QueryParams.AddIgnoredActor(this);
-	if (!bDamageOwner)
+	if (!IsBulletDamageOwner())
 	{
 		QueryParams.AddIgnoredActor(GetInstigator());
 	}
@@ -180,29 +180,29 @@ void ASDTABullet::ProcessHit(AActor* HitActor, UPrimitiveComponent* HitComp, con
 	if (ACharacter* HitCharacter = Cast<ACharacter>(HitActor))
 	{
 		// 忽略所有者
-		if (HitCharacter != GetOwner() || bDamageOwner)
+		if (HitCharacter != GetOwner() || IsBulletDamageOwner())
 		{
 			// 应用伤害
 			UGameplayStatics::ApplyPointDamage(
 				HitCharacter,
-				Damage,
+				GetBulletDamage(),
 				HitDirection,
 				FHitResult(HitCharacter, HitComp, HitLocation, HitDirection),
 				GetInstigatorController(),
 				this,
-				DamageType
+				GetBulletDamageType()
 			);
 
 			// 应用物理力
 			if (HitComp && HitComp->IsSimulatingPhysics())
 			{
-				HitComp->AddImpulse(HitDirection * PhysicsForce);
+				HitComp->AddImpulse(HitDirection * GetBulletPhysicsForce());
 			}
 		}
 
 	} else if (HitComp && HitComp->IsSimulatingPhysics()) {
 		// 应用物理力到物理对象
-		HitComp->AddImpulse(HitDirection * PhysicsForce);
+		HitComp->AddImpulse(HitDirection * GetBulletPhysicsForce());
 	}
 }
 
@@ -216,27 +216,82 @@ void ASDTABullet::OnLifetimeEnd()
 	Destroy();	// 这里本应该集成对象池，但是为了能稳定运行，暂时不集成
 }
 
-void ASDTABullet::SetDamage(float NewDamage)
+void ASDTABullet::SetBulletDamage(float NewDamage)
 {
 	Damage = NewDamage;
 }
 
-void ASDTABullet::SetRange(float NewRange)
+void ASDTABullet::SetBulletRange(float NewRange)
 {
 	Range = NewRange;
 }
 
-void ASDTABullet::SetVelocity(float NewVelocity)
+void ASDTABullet::SetBulletVelocity(float NewVelocity)
 {
 	Velocity = NewVelocity;
 	if (ProjectileMovement)
 	{
-		ProjectileMovement->InitialSpeed = Velocity;
-		ProjectileMovement->MaxSpeed = Velocity;
+		ProjectileMovement->InitialSpeed = GetBulletVelocity();
+		ProjectileMovement->MaxSpeed = GetBulletVelocity();
 	}
 }
 
-void ASDTABullet::SetLifetime(float NewLifetime)
+void ASDTABullet::SetBulletLifetime(float NewLifetime)
 {
 	Lifetime = NewLifetime;
+}
+
+float ASDTABullet::GetBulletDamage() const
+{
+	return Damage;
+}
+
+float ASDTABullet::GetBulletRange() const
+{
+	return Range;
+}
+
+float ASDTABullet::GetBulletVelocity() const
+{
+	return Velocity;
+}
+
+float ASDTABullet::GetBulletLifetime() const
+{
+	return Lifetime;
+}
+
+TSubclassOf<UDamageType> ASDTABullet::GetBulletDamageType() const
+{
+	return DamageType;
+}
+
+bool ASDTABullet::IsBulletDamageOwner() const
+{
+	return bDamageOwner;
+}
+
+bool ASDTABullet::IsBulletExplodeOnHit() const
+{
+	return bExplodeOnHit;
+}
+
+float ASDTABullet::GetBulletExplosionRadius() const
+{
+	return ExplosionRadius;
+}
+
+float ASDTABullet::GetBulletPhysicsForce() const
+{
+	return PhysicsForce;
+}
+
+USphereComponent* ASDTABullet::GetBulletCollisionComponent() const
+{
+	return CollisionComponent;
+}
+
+UProjectileMovementComponent* ASDTABullet::GetBulletProjectileMovement() const
+{
+	return ProjectileMovement;
 }
