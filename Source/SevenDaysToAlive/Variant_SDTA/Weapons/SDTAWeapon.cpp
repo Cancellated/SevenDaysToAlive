@@ -14,11 +14,15 @@ ASDTAWeapon::ASDTAWeapon()
 	// 创建第一人称武器网格
 	FirstPersonMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("FirstPersonMesh"));
 	FirstPersonMesh->SetOnlyOwnerSee(true);
+	FirstPersonMesh->SetCollisionProfileName(FName("NoCollision"));
+	FirstPersonMesh->SetFirstPersonPrimitiveType(EFirstPersonPrimitiveType::FirstPerson);
 	FirstPersonMesh->SetupAttachment(RootComponent);
 
 	// 创建第三人称武器网格
 	ThirdPersonMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("ThirdPersonMesh"));
 	ThirdPersonMesh->SetOwnerNoSee(true);
+	ThirdPersonMesh->SetCollisionProfileName(FName("NoCollision"));
+	ThirdPersonMesh->SetFirstPersonPrimitiveType(EFirstPersonPrimitiveType::WorldSpaceRepresentation);
 	ThirdPersonMesh->SetupAttachment(RootComponent);
 
 	// 设置默认值
@@ -85,19 +89,22 @@ void ASDTAWeapon::StartFiring()
 			ServerStartFire();
 		}
 
-		// 持续开火
-		while (bIsFiring && CanFire())
+		// 立即开火一次
+		if (CanFire())
 		{
 			Fire();
-			// 等待射速间隔
-			if (WeaponDataRow.FireRate > 0.0f)
-			{
-				FPlatformProcess::Sleep(WeaponDataRow.FireRate);
-			}
-			else
-			{
-				break;
-			}
+		}
+
+		// 设置定时器用于持续开火
+		if (WeaponDataRow.FireRate > 0.0f)
+		{
+			GetWorldTimerManager().SetTimer(
+				FireTimerHandle,
+				this,
+				&ASDTAWeapon::OnFireTimer,
+				WeaponDataRow.FireRate,
+				true // 循环执行
+			);
 		}
 	}
 }
@@ -106,6 +113,9 @@ void ASDTAWeapon::StartFiring()
 void ASDTAWeapon::StopFiring()
 {
 	bIsFiring = false;
+
+	// 清理开火定时器
+	GetWorldTimerManager().ClearTimer(FireTimerHandle);
 
 	// 服务器端同步
 	if (GetLocalRole() < ROLE_Authority)
@@ -300,6 +310,17 @@ void ASDTAWeapon::SetWeaponData(const FDataTableRowHandle& NewWeaponData)
 	LoadWeaponData();
 }
 
+// 设置武器数据行
+void ASDTAWeapon::SetWeaponDataRow(const FSDTAWeaponTableRow& NewWeaponDataRow)
+{
+	WeaponDataRow = NewWeaponDataRow;
+	
+	// 更新弹药数量
+	CurrentAmmo = WeaponDataRow.MagazineSize;
+	
+	UE_LOG(LogTemp, Log, TEXT("武器数据行已设置: %s"), *WeaponDataRow.WeaponName);
+}
+
 // 设置武器持有者
 void ASDTAWeapon::SetWeaponOwner(TScriptInterface<ISDTAWeaponHolder> NewOwner)
 {
@@ -402,14 +423,52 @@ void ASDTAWeapon::PlayFiringEffects()
 // 播放开火动画
 void ASDTAWeapon::PlayFiringMontage()
 {
-	if (WeaponOwner && WeaponDataRow.FiringMontage.IsValid())
+	UE_LOG(LogTemp, Log, TEXT("开始播放开火蒙太奇"));
+	
+	if (!WeaponOwner)
 	{
-		UAnimMontage* FiringMontage = WeaponDataRow.FiringMontage.LoadSynchronous();
-		if (FiringMontage)
-		{
-			ISDTAWeaponHolder::Execute_PlayFiringMontage(WeaponOwner.GetObject(), FiringMontage);
-		}
+		UE_LOG(LogTemp, Warning, TEXT("武器持有者无效，无法播放蒙太奇"));
+		return;
 	}
+	
+	// 尝试直接加载蒙太奇资源，不检查有效性
+	UAnimMontage* FiringMontage = WeaponDataRow.FiringMontage.LoadSynchronous();
+	if (!FiringMontage)
+	{
+		UE_LOG(LogTemp, Error, TEXT("开火蒙太奇加载失败，路径: %s"), *WeaponDataRow.FiringMontage.ToString());
+		
+		// 尝试使用软对象路径重新加载
+		FSoftObjectPath MontagePath = WeaponDataRow.FiringMontage.ToSoftObjectPath();
+		UE_LOG(LogTemp, Warning, TEXT("软对象路径: %s"), *MontagePath.ToString());
+		
+		// 尝试手动加载
+		FiringMontage = Cast<UAnimMontage>(MontagePath.TryLoad());
+		if (!FiringMontage)
+		{
+			UE_LOG(LogTemp, Error, TEXT("手动加载蒙太奇也失败"));
+			return;
+		}
+		UE_LOG(LogTemp, Log, TEXT("手动加载蒙太奇成功"));
+	}
+	
+	UE_LOG(LogTemp, Log, TEXT("成功加载开火蒙太奇: %s"), *FiringMontage->GetName());
+	ISDTAWeaponHolder::Execute_PlayFiringMontage(WeaponOwner.GetObject(), FiringMontage);
+	UE_LOG(LogTemp, Log, TEXT("已调用播放蒙太奇接口"));
+}
+
+// 定时器开火回调
+void ASDTAWeapon::OnFireTimer()
+{
+	// 检查是否可以继续开火
+	if (!bIsFiring || !CanFire())
+	{
+		// 停止开火
+		StopFiring();
+		return;
+	}
+
+	// 执行开火逻辑
+	Fire();
 }
 
 // 获取第一人称动画实例类

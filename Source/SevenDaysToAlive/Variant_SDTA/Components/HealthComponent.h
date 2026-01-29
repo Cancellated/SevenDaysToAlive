@@ -11,7 +11,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHealthChangedComponent, float, He
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnHealthLowWarningComponent);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnDeathComponent);
 
-UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
+UCLASS( ClassGroup=(Custom), Blueprintable, BlueprintType, meta=(BlueprintSpawnableComponent) )
 class SEVENDAYSTOALIVE_API UHealthComponent : public UActorComponent
 {
     GENERATED_BODY()

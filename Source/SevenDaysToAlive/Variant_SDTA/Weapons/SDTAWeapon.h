@@ -72,6 +72,9 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "Weapon Owner")
 	TScriptInterface<ISDTAWeaponHolder> WeaponOwner;
 
+	// 开火定时器句柄
+	FTimerHandle FireTimerHandle;
+
 public:
 	// 激活武器
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
@@ -92,6 +95,9 @@ public:
 	// 开火逻辑
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	void Fire();
+
+	// 定时器开火回调
+	void OnFireTimer();
 
 	// 发射实体子弹
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
@@ -120,6 +126,18 @@ public:
 	// 设置武器持有者
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	void SetWeaponOwner(TScriptInterface<ISDTAWeaponHolder> NewOwner);
+
+	// 设置武器数据行
+	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	void SetWeaponDataRow(const FSDTAWeaponTableRow& NewWeaponDataRow);
+
+	// 获取武器数据行
+	UFUNCTION(BlueprintPure, Category = "Weapon")
+	FSDTAWeaponTableRow GetWeaponDataRow() const { return WeaponDataRow; }
+
+	// 获取武器数据表格句柄
+	UFUNCTION(BlueprintPure, Category = "Weapon")
+	FDataTableRowHandle GetWeaponData() const { return WeaponData; }
 
 	// 获取当前弹药数量
 	UFUNCTION(BlueprintPure, Category = "Weapon")

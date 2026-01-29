@@ -10,7 +10,7 @@
 #include "DashComponent.generated.h"
 
 
-UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
+UCLASS( ClassGroup=(Custom), Blueprintable, BlueprintType, meta=(BlueprintSpawnableComponent) )
 class SEVENDAYSTOALIVE_API UDashComponent : public UActorComponent
 {
 	GENERATED_BODY()

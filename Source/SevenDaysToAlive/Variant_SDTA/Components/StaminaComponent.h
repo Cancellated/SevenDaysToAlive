@@ -10,7 +10,7 @@
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnStaminaChangedComponent, float, StaminaPercent);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnStaminaLowWarningComponent);
 
-UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
+UCLASS( ClassGroup=(Custom), Blueprintable, BlueprintType, meta=(BlueprintSpawnableComponent) )
 class SEVENDAYSTOALIVE_API UStaminaComponent : public UActorComponent
 {
     GENERATED_BODY()
