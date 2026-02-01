@@ -185,4 +185,8 @@ private:
 
 	// 处理武器切换输入
 	void HandleSwitchWeaponInput();
+
+	// 换弹完成回调
+	UFUNCTION()
+	void OnReloadCompleted();
 };

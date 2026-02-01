@@ -97,6 +97,26 @@ void AEnemyBase::Tick(float DeltaTime)
 }
 
 /**
+ * 网络同步属性配置
+ * 
+ * 功能：配置需要在网络上同步的敌人属性
+ * 设计要点：
+ * 1. 使用 DOREPLIFETIME 宏配置需要同步的属性
+ * 2. 确保所有关键状态都能在服务器和客户端之间保持一致
+ * 3. 支持多人游戏中的敌人状态同步
+ */
+void AEnemyBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	
+	// 同步敌人的核心属性
+	DOREPLIFETIME(AEnemyBase, Health);
+	DOREPLIFETIME(AEnemyBase, MaxHealth);
+	DOREPLIFETIME(AEnemyBase, Damage);
+	DOREPLIFETIME(AEnemyBase, MoveSpeed);
+}
+
+/**
  * 处理敌人受到的伤害
  * 
  * 功能：处理伤害事件，更新生命值，触发死亡逻辑
@@ -221,7 +241,7 @@ void AEnemyBase::Die()
 	}
 
 	// 通知游戏模式敌人死亡
-	// OnEnemyDestroyed.Broadcast(this);
+	OnEnemyDestroyed.Broadcast(this);
 }
 
 /**

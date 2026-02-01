@@ -66,30 +66,33 @@ public:
 	 */
 protected:
 	virtual void BeginPlay() override;
-
-	/**
-	 * 每一帧更新时调用
-	 * 
-	 * 功能：更新敌人的状态和行为
-	 * 设计要点：处理AI行为、动画状态、移动等逻辑
-	 * 
-	 * @param DeltaTime 帧间隔时间，单位为秒
-	 */
 	virtual void Tick(float DeltaTime) override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 public:
 	// 敌人属性
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category = "Enemy")
 	float Health;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category = "Enemy")
 	float MaxHealth;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category = "Enemy")
 	float Damage;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category = "Enemy")
 	float MoveSpeed;
+
+	/**
+	 * 敌人死亡事件委托
+	 * 
+	 * 功能：当敌人死亡时触发，用于通知GameMode处理死亡逻辑
+	 * 设计要点：使用动态多播委托，支持多订阅者监听
+	 */
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FEnemyDestroyedDelegate, class AEnemyBase*, DestroyedEnemy);
+
+	UPROPERTY(BlueprintAssignable, Category = "Enemy|Events")
+	FEnemyDestroyedDelegate OnEnemyDestroyed;
 /**
 	 * 处理敌人受到的伤害
 	 * 

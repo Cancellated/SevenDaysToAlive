@@ -115,7 +115,7 @@ public:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Enemy Spawn")
 	int32 CurrentEnemyCount; // 当前场景中敌人数量
 	
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Enemy Spawn")
+	UPROPERTY(EditDefaultsOnly, Replicated, BlueprintReadWrite, Category = "Enemy Spawn")
 	int32 MaxEnemyCount; // 最大敌人数量
 	
 	// 波次生成配置
@@ -133,6 +133,7 @@ public:
 	// 敌人管理
 	void OnEnemyDestroyed(class AEnemyBase* DestroyedEnemy);
 	void CleanupDeadEnemies();
+	void ClearAllEnemies(); // 清理所有敌人（白天开始时调用）
 #pragma endregion
 
 #pragma region 资源与升级系统

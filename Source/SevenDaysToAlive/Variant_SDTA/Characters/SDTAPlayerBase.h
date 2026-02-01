@@ -7,6 +7,7 @@
 #include "Variant_SDTA/Components/HealthComponent.h"
 #include "Variant_SDTA/Components/StaminaComponent.h"
 #include "Variant_SDTA/Weapons/SDTAWeaponHolderInterface.h"
+#include "Variant_SDTA/UI/SDTAWeaponUI.h"
 #include "SDTAPlayerBase.generated.h"
 
 // 健康值变化委托
@@ -32,6 +33,10 @@ class SEVENDAYSTOALIVE_API ASDTAPlayerBase : public ASevenDaysToAliveCharacter, 
 public:
 	/** 构造函数 */
 	ASDTAPlayerBase();
+	
+	/** 武器UI蓝图类，用于生成武器UI */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
+	TSubclassOf<USDTAWeaponUI> WeaponUIClass;
 
 protected:
 	/** 冲刺输入动作 */
@@ -41,6 +46,10 @@ protected:
 	/** 开火输入动作 */
 	UPROPERTY(EditAnywhere, Category ="Input")
 	UInputAction* FireAction;
+
+	/** 换弹输入动作 */
+	UPROPERTY(EditAnywhere, Category ="Input")
+	UInputAction* ReloadAction;
 
 protected:
 	/** 游戏开始时调用 */
@@ -71,6 +80,12 @@ public:
 	/** 处理开火输入 */
 	virtual void DoFireStart();
 
+	/** 处理停止开火输入 */
+	virtual void DoFireEnd();
+
+	/** 处理换弹输入 */
+	virtual void DoReload();
+
 	/** 当Actor结束生命周期时调用 */
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
@@ -86,9 +101,13 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	class UDashComponent* DashComponent;
 
-	// 武器管理组件
+	///** 武器管理组件 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	class USDTAWeaponManagerComponent* WeaponManagerComponent;
+	
+	/** 当前生成的武器UI实例 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UI")
+	USDTAWeaponUI* WeaponUIInstance;
 
 	// 健康值变化委托
 	UPROPERTY(BlueprintAssignable, Category = "Events")
@@ -179,6 +198,21 @@ protected:
 	void MulticastAddRecoil(float RecoilAmount);
 
 private:
-	// 内部动画实例类切换方法
+	///** 内部动画实例类切换方法 */
 	void SwitchAnimInstanceClass(TSubclassOf<UAnimInstance> FirstPersonClass, TSubclassOf<UAnimInstance> ThirdPersonClass);
+	
+protected:
+	/** 生成武器UI */
+	void SpawnWeaponUI();
+	
+	/** 销毁武器UI */
+	void DestroyWeaponUI();
+	
+	/** 获取武器UI实例（蓝图可调用） */
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	USDTAWeaponUI* GetWeaponUIInstance() const;
+	
+	/** 更新武器UI的弹药显示 */
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void UpdateWeaponUI(int32 CurrentAmmo, int32 MaxAmmo);
 };

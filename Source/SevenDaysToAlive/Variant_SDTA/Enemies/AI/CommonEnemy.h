@@ -34,12 +34,15 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI Config")
 	float AttackCooldown; // 攻击冷却时间（秒）
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI Config")
-	float PatrolRange; // 巡逻范围（cm）
+	// 动画变量
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Animation")
+	bool IsMoving;  // 是否正在移动
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Animation")
+	bool IsAttacking;  // 是否正在攻击
 
 	// 实现基类的AI行为
 	virtual void ChasePlayer() override;
-	virtual void Patrol() override;
 	virtual void AttackPlayer() override;
 
 	// 获取玩家角色
@@ -57,18 +60,9 @@ private:
 	UPROPERTY()
 	class ASDTAPlayerBase* PlayerRef;
 
-	// 初始位置（用于巡逻）
-	FVector InitialLocation;
-
-	// 巡逻目标位置
-	FVector PatrolTargetLocation;
-
 	// 设置攻击冷却
 	void SetAttackCooldown();
 
 	// 攻击冷却结束回调
 	void OnAttackCooldownFinished();
-
-	// 选择新的巡逻目标
-	void SelectNewPatrolTarget();
 };

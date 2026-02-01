@@ -10,6 +10,9 @@
 #include "SDTAWeaponHolderInterface.h"
 #include "SDTAWeapon.generated.h"
 
+// 换弹完成委托
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnReloadCompleted);
+
 // 前向声明
 class ISDTAWeaponHolder;
 class USkeletalMeshComponent;
@@ -186,6 +189,10 @@ public:
 	// 服务器端装填弹药
 	UFUNCTION(Server, Reliable, WithValidation)
 	void ServerReload();
+
+	// 换弹完成委托
+	UPROPERTY(BlueprintAssignable, Category = "Weapon Events")
+	FOnReloadCompleted OnReloadCompleted;
 
 protected:
 	// 加载武器数据

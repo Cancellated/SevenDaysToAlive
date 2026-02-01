@@ -63,6 +63,9 @@ void USDTAWeaponManagerComponent::AddWeaponClass(TSubclassOf<ASDTAWeapon> Weapon
 		// 将武器附加到玩家身上
 		AttachWeaponMeshes(NewWeapon);
 
+		// 绑定换弹完成委托
+		NewWeapon->OnReloadCompleted.AddDynamic(this, &USDTAWeaponManagerComponent::OnReloadCompleted);
+
 		// 添加到武器列表
 		OwnedWeapons.Add(NewWeapon);
 
@@ -172,9 +175,16 @@ void USDTAWeaponManagerComponent::Reload()
 
 	if (CurrentWeapon && !bIsReloading && !bIsSwitchingWeapon)
 	{
+		// 检查弹药是否已满
+		if (CurrentWeapon->GetCurrentAmmo() >= CurrentWeapon->GetMagazineSize())
+		{
+			UE_LOG(LogTemp, Log, TEXT("弹药已满，无需换弹"));
+			return;
+		}
+
 		bIsReloading = true;
 		CurrentWeapon->Reload();
-		// 这里应该有一个装填完成的回调来重置bIsReloading
+		UE_LOG(LogTemp, Log, TEXT("开始换弹"));
 	}
 }
 
@@ -508,4 +518,11 @@ void USDTAWeaponManagerComponent::HandleReloadInput()
 void USDTAWeaponManagerComponent::HandleSwitchWeaponInput()
 {
 	// 输入处理将在具体的输入配置中实现
+}
+
+void USDTAWeaponManagerComponent::OnReloadCompleted()
+{
+	// 换弹完成，重置换弹状态
+	bIsReloading = false;
+	UE_LOG(LogTemp, Log, TEXT("换弹完成，已重置换弹状态"));
 }

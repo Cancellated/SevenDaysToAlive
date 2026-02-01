@@ -301,6 +301,9 @@ void ASDTAWeapon::Reload()
 	{
 		ISDTAWeaponHolder::Execute_UpdateWeaponHUD(WeaponOwner.GetObject(), CurrentAmmo, WeaponDataRow.MagazineSize);
 	}
+
+	// 广播换弹完成委托
+	OnReloadCompleted.Broadcast();
 }
 
 // 设置武器数据

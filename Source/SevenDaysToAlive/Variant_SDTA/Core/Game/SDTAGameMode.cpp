@@ -23,9 +23,11 @@
  */
 
 #include "Variant_SDTA/Core/Game/SDTAGameMode.h"
+#include "SevenDaysToAlive.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
+#include "Math/UnrealMathUtility.h"
 #include "GameFramework/PlayerState.h"
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
@@ -57,6 +59,10 @@ ASDTAGameMode::ASDTAGameMode()
 	
 	CurrentEnemyCount = 0;
 	MaxEnemyCount = 20;
+	
+	// 设置默认敌人生成配置（7天的标准配置）
+	WaveSizes = { 3, 5, 8, 12, 15, 18, 20 }; // 每天生成敌人数量
+	WaveIntervals = { 60.0f, 45.0f, 30.0f, 25.0f, 20.0f, 15.0f, 10.0f }; // 每天生成间隔（秒）
 	
 	SoulFragments = 0;
 	
@@ -209,27 +215,236 @@ void ASDTAGameMode::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 #pragma region 敌人生成系统 - 方法声明
 void ASDTAGameMode::SpawnEnemyWave()
 {
-	// TODO: 实现敌人生成波次逻辑
+	// 主机权威：只在服务器端执行
+	if (!HasAuthority()) return;
+
+	// 检查是否达到最大敌人数量
+	if (CurrentEnemyCount >= MaxEnemyCount)
+	{
+		UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAGameMode] 已达到最大敌人数量: %d / %d"), 
+		       CurrentEnemyCount, MaxEnemyCount);
+		return;
+	}
+
+	// 获取当前天数的敌人生成数量
+	int32 WaveIndex = FMath::Min(CurrentDay - 1, WaveSizes.Num() - 1);
+	int32 EnemiesToSpawn = WaveSizes.IsValidIndex(WaveIndex) ? WaveSizes[WaveIndex] : 3;
+
+	// 限制生成数量，不超过最大敌人数量
+	int32 AvailableSlots = MaxEnemyCount - CurrentEnemyCount;
+	EnemiesToSpawn = FMath::Min(EnemiesToSpawn, AvailableSlots);
+
+	if (EnemiesToSpawn <= 0)
+	{
+		return;
+	}
+
+	UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAGameMode] 生成第 %d 波敌人，数量: %d"), 
+	       CurrentDay, EnemiesToSpawn);
+
+	// 逐个生成敌人
+	for (int32 i = 0; i < EnemiesToSpawn; i++)
+	{
+		// 获取玩家位置作为参考
+		APlayerController* PlayerController = GetWorld()->GetFirstPlayerController();
+		if (!PlayerController || !PlayerController->GetPawn())
+		{
+			continue;
+		}
+
+		FVector PlayerLocation = PlayerController->GetPawn()->GetActorLocation();
+
+		// 在玩家周围随机位置生成敌人（距离 500-1500 cm）
+		float SpawnDistance = FMath::FRandRange(500.0f, 1500.0f);
+		float Angle = FMath::FRandRange(0.0f, 2 * PI);
+
+		FVector SpawnLocation = PlayerLocation + FVector(
+			FMath::Cos(Angle) * SpawnDistance,
+			FMath::Sin(Angle) * SpawnDistance,
+			0.0f
+		);
+
+		// 生成敌人
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.SpawnCollisionHandlingOverride = 
+			ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+		SpawnParams.Owner = this;
+
+		AEnemyBase* NewEnemy = GetWorld()->SpawnActor<AEnemyBase>(
+			EnemyClass, 
+			SpawnLocation, 
+			FRotator::ZeroRotator, 
+			SpawnParams
+		);
+
+		if (NewEnemy)
+		{
+			// 增加敌人计数
+			CurrentEnemyCount++;
+
+			// 添加到活跃敌人列表
+			ActiveEnemies.Add(NewEnemy);
+
+			// 绑定敌人死亡事件
+			NewEnemy->OnEnemyDestroyed.AddDynamic(this, &ASDTAGameMode::OnEnemyDestroyed);
+
+			UE_LOG(LogSevenDaysToAlive, Verbose, TEXT("[SDTAGameMode] 成功生成敌人 at %s"), 
+			       *SpawnLocation.ToString());
+		}
+	}
 }
 
 void ASDTAGameMode::StartEnemySpawning()
 {
-	// TODO: 开始敌人生成
+	// 主机权威：只在服务器端执行
+	if (!HasAuthority()) return;
+
+	// 检查是否已经在生成
+	if (GetWorld()->GetTimerManager().IsTimerActive(EnemySpawnTimer))
+	{
+		return;
+	}
+
+	// 检查配置是否有效
+	if (!EnemyClass || WaveSizes.Num() == 0 || WaveIntervals.Num() == 0)
+	{
+		UE_LOG(LogSevenDaysToAlive, Warning, TEXT("[SDTAGameMode] 敌人生成配置不完整"));
+		return;
+	}
+
+	// 获取当前天数的生成间隔
+	int32 IntervalIndex = FMath::Min(CurrentDay - 1, WaveIntervals.Num() - 1);
+	float SpawnInterval = WaveIntervals.IsValidIndex(IntervalIndex) ? 
+		WaveIntervals[IntervalIndex] : 60.0f;
+
+	UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAGameMode] 开始敌人生成，间隔: %.1f 秒"), 
+	       SpawnInterval);
+
+	// 设置生成定时器
+	GetWorld()->GetTimerManager().SetTimer(
+		EnemySpawnTimer,
+		this,
+		&ASDTAGameMode::SpawnEnemyWave,
+		SpawnInterval,
+		true
+	);
 }
 
 void ASDTAGameMode::StopEnemySpawning()
 {
-	// TODO: 停止敌人生成
+	// 主机权威：只在服务器端执行
+	if (!HasAuthority()) return;
+
+	// 停止生成定时器
+	if (GetWorld()->GetTimerManager().IsTimerActive(EnemySpawnTimer))
+	{
+		GetWorld()->GetTimerManager().ClearTimer(EnemySpawnTimer);
+		UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAGameMode] 已停止敌人生成"));
+	}
 }
 
-void ASDTAGameMode::OnEnemyDestroyed(class AEnemyBase* DestroyedEnemy)
+void ASDTAGameMode::OnEnemyDestroyed(AEnemyBase* DestroyedEnemy)
 {
-	// TODO: 处理敌人被击败事件
+	// 主机权威：只在服务器端执行
+	if (!HasAuthority()) return;
+
+	if (!DestroyedEnemy)
+	{
+		return;
+	}
+
+	// 减少敌人计数
+	if (CurrentEnemyCount > 0)
+	{
+		CurrentEnemyCount--;
+	}
+
+	// 从活跃敌人列表中移除
+	int32 EnemyIndex = ActiveEnemies.Find(DestroyedEnemy);
+	if (EnemyIndex != INDEX_NONE)
+	{
+		ActiveEnemies.RemoveAt(EnemyIndex);
+	}
+
+	// 收集灵魂碎片奖励（每个敌人掉落 1-3 个碎片）
+	int32 SoulReward = FMath::RandRange(1, 3);
+	CollectSoulFragments(SoulReward);
+
+	UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAGameMode] 敌人被击败，剩余: %d, 奖励灵魂碎片: %d"), 
+	       CurrentEnemyCount, SoulReward);
 }
 
 void ASDTAGameMode::CleanupDeadEnemies()
 {
-	// TODO: 清理死亡敌人
+	// 主机权威：只在服务器端执行
+	if (!HasAuthority()) return;
+
+	TArray<AEnemyBase*> DeadEnemies;
+
+	// 找出所有无效或死亡的敌人
+	for (AEnemyBase* Enemy : ActiveEnemies)
+	{
+		if (!Enemy || Enemy->IsActorBeingDestroyed())
+		{
+			DeadEnemies.Add(Enemy);
+		}
+	}
+
+	// 移除死亡敌人
+	for (AEnemyBase* DeadEnemy : DeadEnemies)
+	{
+		ActiveEnemies.Remove(DeadEnemy);
+	}
+
+	// 更新敌人计数
+	CurrentEnemyCount = ActiveEnemies.Num();
+}
+
+/**
+ * 清理所有敌人
+ * 
+ * 功能：在白天开始时清理场景中所有的敌人
+ * 设计要点：
+ * 1. 主机权威：只在服务器端执行
+ * 2. 遍历所有活跃敌人并销毁
+ * 3. 重置敌人计数和活跃敌人列表
+ * 4. 提供视觉反馈和日志记录
+ *
+ * 注意：该方法通常在白天开始时调用
+ */
+void ASDTAGameMode::ClearAllEnemies()
+{
+	// 主机权威：只在服务器端执行
+	if (!HasAuthority()) return;
+
+	if (ActiveEnemies.Num() == 0)
+	{
+		return;
+	}
+
+	UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAGameMode] 白天开始，清理所有敌人（数量: %d）"), 
+	       ActiveEnemies.Num());
+
+	// 遍历并销毁所有敌人
+	for (AEnemyBase* Enemy : ActiveEnemies)
+	{
+		if (Enemy && !Enemy->IsActorBeingDestroyed())
+		{
+			// 解绑死亡事件委托
+			Enemy->OnEnemyDestroyed.RemoveDynamic(this, &ASDTAGameMode::OnEnemyDestroyed);
+			
+			// 直接销毁敌人（不触发死亡事件）
+			Enemy->Destroy();
+		}
+	}
+
+	// 清空活跃敌人列表
+	ActiveEnemies.Empty();
+	
+	// 重置敌人计数
+	CurrentEnemyCount = 0;
+
+	UE_LOG(LogSevenDaysToAlive, Log, TEXT("[SDTAGameMode] 所有敌人已清理完毕"));
 }
 #pragma endregion
 
@@ -391,10 +606,16 @@ void ASDTAGameMode::OnDayNightStateChanged(bool bIsNowNight)
 	if (bIsNowNight)
 	{
 		UE_LOG(LogTemp, Log, TEXT("夜晚阶段开始！第 %d 天"), CurrentDay);
+		// 夜晚开始时启动敌人生成
+		StartEnemySpawning();
 	}
 	else
 	{
 		UE_LOG(LogTemp, Log, TEXT("白天阶段开始！第 %d 天"), CurrentDay);
+		// 白天开始时停止敌人生成
+		StopEnemySpawning();
+		// 清理所有敌人
+		ClearAllEnemies();
 		// 分配灵魂碎片用于升级
 		DistributeSoulFragments();
 	}

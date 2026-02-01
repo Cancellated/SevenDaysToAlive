@@ -6,9 +6,12 @@
 #include "Variant_SDTA/Components/StaminaComponent.h"
 #include "Variant_SDTA/Components/DashComponent.h"
 #include "Variant_SDTA/Components/USDTAWeaponManagerComponent.h"
+#include "Variant_SDTA/UI/SDTAWeaponUI.h"
 #include "EnhancedInputComponent.h"
 #include "InputAction.h"
 #include "SevenDaysToAlive.h"
+#include "Blueprint/WidgetBlueprintLibrary.h"
+#include "Kismet/GameplayStatics.h"
 
 // 设置默认值
 ASDTAPlayerBase::ASDTAPlayerBase()
@@ -78,6 +81,9 @@ void ASDTAPlayerBase::BeginPlay()
 	{
 		WeaponManagerComponent->EquipInitialWeapon();
 	}
+	
+	// 生成武器UI
+	SpawnWeaponUI();
 }
 
 // Called every frame
@@ -104,8 +110,34 @@ void ASDTAPlayerBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 		if (FireAction)
 		{
 			EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Started, this, &ASDTAPlayerBase::DoFireStart);
-			UE_LOG(LogTemp, Log, TEXT("开火输入绑定成功"));
+			EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Completed, this, &ASDTAPlayerBase::DoFireEnd);
+			UE_LOG(LogTemp, Log, TEXT("开火输入绑定成功（包含开始和结束事件）"));
 		}
+
+		// 添加换弹输入绑定
+		if (ReloadAction)
+		{
+			EnhancedInputComponent->BindAction(ReloadAction, ETriggerEvent::Started, this, &ASDTAPlayerBase::DoReload);
+			UE_LOG(LogTemp, Log, TEXT("换弹输入绑定成功"));
+		}
+	}
+}
+
+/** 处理换弹输入 */
+void ASDTAPlayerBase::DoReload()
+{
+	// 处理换弹逻辑
+	UE_LOG(LogTemp, Log, TEXT("换弹输入触发"));
+	
+	// 调用武器管理组件的换弹方法
+	if (WeaponManagerComponent)
+	{
+		WeaponManagerComponent->Reload();
+		UE_LOG(LogTemp, Log, TEXT("已调用武器管理组件换弹"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("武器管理组件未找到"));
 	}
 }
 
@@ -175,6 +207,24 @@ void ASDTAPlayerBase::DoFireStart()
 	}
 }
 
+/** 处理停止开火输入 */
+void ASDTAPlayerBase::DoFireEnd()
+{
+	// 这里可以添加停止开火逻辑
+	UE_LOG(LogTemp, Log, TEXT("停止开火输入触发"));
+	
+	// 调用武器管理组件的停止开火方法
+	if (WeaponManagerComponent)
+	{
+		WeaponManagerComponent->StopFire();
+		UE_LOG(LogTemp, Log, TEXT("已调用武器管理组件停止开火"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("武器管理组件未找到"));
+	}
+}
+
 /** 健康值变化回调 */
 void ASDTAPlayerBase::OnHealthComponentChanged(float HealthPercent)
 {
@@ -208,6 +258,9 @@ void ASDTAPlayerBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		HealthComponent->OnHealthChanged.RemoveDynamic(this, &ASDTAPlayerBase::OnHealthComponentChanged);
 		HealthComponent->OnDeath.RemoveDynamic(this, &ASDTAPlayerBase::OnHealthComponentDeath);
 	}
+	
+	// 销毁武器UI
+	DestroyWeaponUI();
 }
 
 // ============================================================================
@@ -287,7 +340,9 @@ void ASDTAPlayerBase::AddWeaponRecoil_Implementation(float RecoilAmount)
 /** 更新武器HUD */
 void ASDTAPlayerBase::UpdateWeaponHUD_Implementation(int32 CurrentAmmo, int32 MaxAmmo)
 {
-	// 这里可以更新HUD显示弹药信息
+	// 更新武器UI的弹药显示
+	UpdateWeaponUI(CurrentAmmo, MaxAmmo);
+	
 	UE_LOG(LogTemp, Log, TEXT("更新HUD: %d/%d"), CurrentAmmo, MaxAmmo);
 }
 
@@ -439,6 +494,94 @@ void ASDTAPlayerBase::MulticastAddRecoil_Implementation(float RecoilAmount)
 {
 	// 所有客户端应用后坐力
 	UE_LOG(LogTemp, Log, TEXT("网络同步应用后坐力: %.2f"), RecoilAmount);
+}
+
+/** 生成武器UI */
+void ASDTAPlayerBase::SpawnWeaponUI()
+{
+	// 检查是否已经生成了武器UI
+	if (WeaponUIInstance)
+	{
+		return;
+	}
+	
+	// 检查是否配置了武器UI蓝图类
+	if (!WeaponUIClass)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("未配置武器UI蓝图类，无法生成武器UI"));
+		return;
+	}
+	
+	// 检查是否是本地控制的玩家（只在客户端生成UI）
+	if (!IsLocallyControlled())
+	{
+		return;
+	}
+	
+	// 获取玩家控制器
+	APlayerController* PlayerController = GetController<APlayerController>();
+	if (!PlayerController)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("无法获取玩家控制器，无法生成武器UI"));
+		return;
+	}
+	
+	// 获取玩家UI层
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("无法获取世界上下文，无法生成武器UI"));
+		return;
+	}
+	
+	// 创建武器UI实例
+	WeaponUIInstance = CreateWidget<USDTAWeaponUI>(PlayerController, WeaponUIClass);
+	
+	if (WeaponUIInstance)
+	{
+		// 添加到玩家UI层
+		WeaponUIInstance->AddToViewport();
+		
+		UE_LOG(LogTemp, Log, TEXT("武器UI生成成功: %s"), *WeaponUIInstance->GetName());
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("武器UI生成失败"));
+	}
+}
+
+/** 销毁武器UI */
+void ASDTAPlayerBase::DestroyWeaponUI()
+{
+	if (WeaponUIInstance)
+	{
+		// 从父节点移除（替代RemoveFromViewport）
+		WeaponUIInstance->RemoveFromParent();
+		
+		// 清空引用，让垃圾回收处理
+		WeaponUIInstance = nullptr;
+		
+		UE_LOG(LogTemp, Log, TEXT("武器UI已销毁"));
+	}
+}
+
+/** 获取武器UI实例（蓝图可调用） */
+USDTAWeaponUI* ASDTAPlayerBase::GetWeaponUIInstance() const
+{
+	return WeaponUIInstance;
+}
+
+/** 更新武器UI的弹药显示 */
+void ASDTAPlayerBase::UpdateWeaponUI(int32 CurrentAmmo, int32 MaxAmmo)
+{
+	if (WeaponUIInstance)
+	{
+		// 更新武器UI的弹药信息
+		WeaponUIInstance->CurrentAmmo = CurrentAmmo;
+		WeaponUIInstance->MagazineSize = MaxAmmo;
+		
+		UE_LOG(LogTemp, Log, TEXT("更新武器UI: %d/%d"), CurrentAmmo, MaxAmmo);
+	}
 }
 
 // ============================================================================
