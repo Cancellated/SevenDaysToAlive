@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Variant_SDTA\Core\Game\SDTAPlayerState.h"
+#include "Variant_SDTA\Weapons\SDTAWeaponManager.h"
 #include "Net/UnrealNetwork.h"
 
 ASDTAPlayerState::ASDTAPlayerState()
@@ -15,6 +16,12 @@ ASDTAPlayerState::ASDTAPlayerState()
 void ASDTAPlayerState::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// 初始化武器管理器
+	WeaponManager = NewObject<USDTAWeaponManager>();
+	WeaponManager->Initialize(this);
+
+	UE_LOG(LogTemp, Log, TEXT("玩家状态初始化武器管理器"));
 }
 
 void ASDTAPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

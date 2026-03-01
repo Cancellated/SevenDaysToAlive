@@ -17,6 +17,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnReloadCompleted);
 class ISDTAWeaponHolder;
 class USkeletalMeshComponent;
 class UAnimMontage;
+class USDTAWeaponManager;
 
 /**
  * 武器基类，实现武器核心功能
@@ -40,40 +41,52 @@ protected:
 	USkeletalMeshComponent* ThirdPersonMesh;
 
 	// 武器数据表行引用
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Data")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Data", 
+		meta = (Deprecated, DeprecationMessage = "Use WeaponManager's Weapon Data system instead"))
 	FDataTableRowHandle WeaponData;
 
 	// 武器数据
-	UPROPERTY(BlueprintReadOnly, Category = "Weapon Data")
+	UPROPERTY(BlueprintReadOnly, Category = "Weapon Data", 
+		meta = (Deprecated, DeprecationMessage = "Use WeaponManager's Weapon Data system instead"))
 	FSDTAWeaponTableRow WeaponDataRow;
 
 	// 当前弹药数量
-	UPROPERTY(BlueprintReadWrite, Category = "Weapon Data")
+	UPROPERTY(BlueprintReadWrite, Category = "Weapon Data", 
+		meta = (Deprecated, DeprecationMessage = "Use WeaponManager->GetCurrentWeaponAmmo() instead"))
 	int32 CurrentAmmo;
 
 	// 是否正在开火
-	UPROPERTY(BlueprintReadOnly, Category = "Weapon State")
+	UPROPERTY(BlueprintReadOnly, Category = "Weapon State", 
+		meta = (Deprecated, DeprecationMessage = "Use WeaponManager->IsFiring() instead"))
 	bool bIsFiring;
 
 	// 上次开火时间
-	UPROPERTY(BlueprintReadOnly, Category = "Weapon State")
+	UPROPERTY(BlueprintReadOnly, Category = "Weapon State", 
+		meta = (Deprecated, DeprecationMessage = "Use WeaponManager for firing state instead"))
 	float LastFireTime;
 
 	// 武器后坐力
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Data")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Data", 
+		meta = (Deprecated, DeprecationMessage = "Use WeaponManager's recoil system instead"))
 	float Recoil;
 
 	// 子弹类
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Data")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Data", 
+		meta = (Deprecated, DeprecationMessage = "Use WeaponManager's BulletClass instead"))
 	TSubclassOf<ASDTABullet> BulletClass;
 
 	// 枪口socket名称
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Data")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Data", 
+		meta = (Deprecated, DeprecationMessage = "Use WeaponManager's MuzzleSocketName instead"))
 	FName MuzzleSocketName;
 
 	// 武器持有者
 	UPROPERTY(BlueprintReadOnly, Category = "Weapon Owner")
 	TScriptInterface<ISDTAWeaponHolder> WeaponOwner;
+
+	// 武器管理器引用
+	UPROPERTY(BlueprintReadWrite, Category = "Weapon Manager")
+	USDTAWeaponManager* WeaponManager;
 
 	// 开火定时器句柄
 	FTimerHandle FireTimerHandle;
@@ -96,71 +109,85 @@ public:
 	void StopFiring();
 
 	// 开火逻辑
-	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	UFUNCTION(BlueprintCallable, Category = "Weapon", 
+		meta = (Deprecated, DeprecationMessage = "Use WeaponManager->FireOnce() instead"))
 	void Fire();
 
 	// 定时器开火回调
 	void OnFireTimer();
 
 	// 发射实体子弹
-	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	UFUNCTION(BlueprintCallable, Category = "Weapon", 
+		meta = (Deprecated, DeprecationMessage = "Use WeaponManager for firing instead"))
 	void FireProjectile();
 
 	// 即时弹道开火
-	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	UFUNCTION(BlueprintCallable, Category = "Weapon", 
+		meta = (Deprecated, DeprecationMessage = "Use WeaponManager for firing instead"))
 	void FireHitScan();
 
 	// 能量束开火
-	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	UFUNCTION(BlueprintCallable, Category = "Weapon", 
+		meta = (Deprecated, DeprecationMessage = "Use WeaponManager for firing instead"))
 	void FireEnergyBeam();
 
 	// 霰弹开火
-	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	UFUNCTION(BlueprintCallable, Category = "Weapon", 
+		meta = (Deprecated, DeprecationMessage = "Use WeaponManager for firing instead"))
 	void FireShotgun();
 
 	// 装填弹药
-	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	UFUNCTION(BlueprintCallable, Category = "Weapon", 
+		meta = (Deprecated, DeprecationMessage = "Use WeaponManager->ReloadCurrentWeapon() instead"))
 	void Reload();
 
 	// 设置武器数据
-	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	UFUNCTION(BlueprintCallable, Category = "Weapon", 
+		meta = (Deprecated, DeprecationMessage = "Use WeaponManager for weapon data management instead"))
 	void SetWeaponData(const FDataTableRowHandle& NewWeaponData);
 
 	// 设置武器持有者
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	void SetWeaponOwner(TScriptInterface<ISDTAWeaponHolder> NewOwner);
 
-	// 设置武器数据行
+	// 设置武器管理器
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	void SetWeaponManager(USDTAWeaponManager* Manager);
+
+	// 设置武器数据行
+	UFUNCTION(BlueprintCallable, Category = "Weapon", 
+		meta = (Deprecated, DeprecationMessage = "Use WeaponManager for weapon data management instead"))
 	void SetWeaponDataRow(const FSDTAWeaponTableRow& NewWeaponDataRow);
 
 	// 获取武器数据行
-	UFUNCTION(BlueprintPure, Category = "Weapon")
+	UFUNCTION(BlueprintPure, Category = "Weapon", 
+		meta = (Deprecated, DeprecationMessage = "Use WeaponManager->GetCurrentWeaponDataRow() instead"))
 	FSDTAWeaponTableRow GetWeaponDataRow() const { return WeaponDataRow; }
 
-	// 获取武器数据表格句柄
-	UFUNCTION(BlueprintPure, Category = "Weapon")
+	// 获取武器数据表格句柄（武器表格类在SDTAWeaponTypes）
+	UFUNCTION(BlueprintPure, Category = "Weapon", 
+		meta = (Deprecated, DeprecationMessage = "Use WeaponManager for weapon data management instead"))
 	FDataTableRowHandle GetWeaponData() const { return WeaponData; }
 
 	// 获取当前弹药数量
 	UFUNCTION(BlueprintPure, Category = "Weapon")
-	int32 GetCurrentAmmo() const { return CurrentAmmo; }
+	int32 GetCurrentAmmo() const;
 
 	// 获取弹匣容量
 	UFUNCTION(BlueprintPure, Category = "Weapon")
-	int32 GetMagazineSize() const { return WeaponDataRow.MagazineSize; }
+	int32 GetMagazineSize() const;
 
 	// 获取武器伤害
 	UFUNCTION(BlueprintPure, Category = "Weapon")
-	float GetWeaponDamage() const { return WeaponDataRow.Damage; }
+	float GetWeaponDamage() const;
 
 	// 获取武器射程
 	UFUNCTION(BlueprintPure, Category = "Weapon")
-	float GetWeaponRange() const { return WeaponDataRow.Range; }
+	float GetWeaponRange() const;
 
 	// 获取武器名称
 	UFUNCTION(BlueprintPure, Category = "Weapon")
-	FString GetWeaponName() const { return WeaponDataRow.WeaponName; }
+	FString GetWeaponName() const;
 
 	// 获取第一人称动画实例类
 	UFUNCTION(BlueprintPure, Category = "Weapon")

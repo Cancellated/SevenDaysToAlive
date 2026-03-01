@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerState.h"
+// 前置声明武器管理器类
+class USDTAWeaponManager;
 #include "SDTAPlayerState.generated.h"
 
 /**
@@ -27,6 +29,10 @@ protected:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 public:
+	// 武器管理器引用
+	UPROPERTY(Transient, BlueprintReadOnly, Category = "Weapon")
+	USDTAWeaponManager* WeaponManager;
+
 	// 玩家个人灵魂碎片
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Player Resources")
 	int32 PlayerSoulFragments;

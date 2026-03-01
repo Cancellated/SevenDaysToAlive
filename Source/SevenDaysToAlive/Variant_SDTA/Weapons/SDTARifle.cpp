@@ -72,11 +72,7 @@ void ASDTAWeaponRifle::Reload()
 	// 更新弹药数量
 	CurrentAmmo = WeaponDataRow.MagazineSize;
 
-	// 更新HUD
-	if (WeaponOwner)
-	{
-		ISDTAWeaponHolder::Execute_UpdateWeaponHUD(WeaponOwner.GetObject(), CurrentAmmo, WeaponDataRow.MagazineSize);
-	}
+	// 注意：UI更新现在由武器管理器处理，这里不再直接更新UI
 }
 
 // 播放开火效果

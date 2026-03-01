@@ -6,6 +6,8 @@
 #include "Variant_SDTA/Components/StaminaComponent.h"
 #include "Variant_SDTA/Components/DashComponent.h"
 #include "Variant_SDTA/Components/USDTAWeaponManagerComponent.h"
+#include "Variant_SDTA/Core/Game/SDTAPlayerState.h"
+#include "Variant_SDTA/Weapons/SDTAWeaponManager.h"
 #include "Variant_SDTA/UI/SDTAWeaponUI.h"
 #include "EnhancedInputComponent.h"
 #include "InputAction.h"
@@ -129,15 +131,17 @@ void ASDTAPlayerBase::DoReload()
 	// 处理换弹逻辑
 	UE_LOG(LogTemp, Log, TEXT("换弹输入触发"));
 	
-	// 调用武器管理组件的换弹方法
-	if (WeaponManagerComponent)
+	// 从玩家状态获取武器管理器实例
+	APlayerState* BasePlayerState = GetPlayerState();
+	ASDTAPlayerState* SDTAState = Cast<ASDTAPlayerState>(BasePlayerState);
+	if (SDTAState && SDTAState->WeaponManager)
 	{
-		WeaponManagerComponent->Reload();
-		UE_LOG(LogTemp, Log, TEXT("已调用武器管理组件换弹"));
+		SDTAState->WeaponManager->ReloadCurrentWeapon();
+		UE_LOG(LogTemp, Log, TEXT("已调用武器管理器换弹"));
 	}
 	else
 	{
-		UE_LOG(LogTemp, Warning, TEXT("武器管理组件未找到"));
+		UE_LOG(LogTemp, Warning, TEXT("武器管理器未找到"));
 	}
 }
 
@@ -195,15 +199,17 @@ void ASDTAPlayerBase::DoFireStart()
 	// 例如：检查武器是否装备，消耗弹药，播放开火动画，生成子弹等
 	UE_LOG(LogTemp, Log, TEXT("开火输入触发"));
 	
-	// 调用武器管理组件的开火方法
-	if (WeaponManagerComponent)
+	// 从玩家状态获取武器管理器实例
+	APlayerState* BasePlayerState = GetPlayerState();
+	ASDTAPlayerState* SDTAState = Cast<ASDTAPlayerState>(BasePlayerState);
+	if (SDTAState && SDTAState->WeaponManager)
 	{
-		WeaponManagerComponent->StartFire();
-		UE_LOG(LogTemp, Log, TEXT("已调用武器管理组件开火"));
+		SDTAState->WeaponManager->StartFiring();
+		UE_LOG(LogTemp, Log, TEXT("已调用武器管理器开火"));
 	}
 	else
 	{
-		UE_LOG(LogTemp, Warning, TEXT("武器管理组件未找到"));
+		UE_LOG(LogTemp, Warning, TEXT("武器管理器未找到"));
 	}
 }
 
@@ -213,15 +219,17 @@ void ASDTAPlayerBase::DoFireEnd()
 	// 这里可以添加停止开火逻辑
 	UE_LOG(LogTemp, Log, TEXT("停止开火输入触发"));
 	
-	// 调用武器管理组件的停止开火方法
-	if (WeaponManagerComponent)
+	// 从玩家状态获取武器管理器实例
+	APlayerState* BasePlayerState = GetPlayerState();
+	ASDTAPlayerState* SDTAState = Cast<ASDTAPlayerState>(BasePlayerState);
+	if (SDTAState && SDTAState->WeaponManager)
 	{
-		WeaponManagerComponent->StopFire();
-		UE_LOG(LogTemp, Log, TEXT("已调用武器管理组件停止开火"));
+		SDTAState->WeaponManager->StopFiring();
+		UE_LOG(LogTemp, Log, TEXT("已调用武器管理器停止开火"));
 	}
 	else
 	{
-		UE_LOG(LogTemp, Warning, TEXT("武器管理组件未找到"));
+		UE_LOG(LogTemp, Warning, TEXT("武器管理器未找到"));
 	}
 }
 

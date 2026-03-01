@@ -8,6 +8,10 @@
 #include "Variant_SDTA/Components/StaminaComponent.h"
 #include "Variant_SDTA/Weapons/SDTAWeaponHolderInterface.h"
 #include "Variant_SDTA/UI/SDTAWeaponUI.h"
+
+// 前向声明
+class ASDTAPlayerState;
+
 #include "SDTAPlayerBase.generated.h"
 
 // 健康值变化委托

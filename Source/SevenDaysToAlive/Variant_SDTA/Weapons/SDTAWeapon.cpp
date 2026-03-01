@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "SDTAWeapon.h"
+#include "SDTAWeaponManager.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/Character.h"
 #include "Kismet/GameplayStatics.h"
@@ -79,32 +80,41 @@ void ASDTAWeapon::DeactivateWeapon()
 // 开始开火
 void ASDTAWeapon::StartFiring()
 {
-	if (!bIsFiring)
+	// 如果有武器管理器，调用管理器的开始开火方法
+	if (WeaponManager)
 	{
-		bIsFiring = true;
-
-		// 服务器端同步
-		if (GetLocalRole() < ROLE_Authority)
+		WeaponManager->StartFiring();
+	}
+	// 否则使用旧逻辑
+	else
+	{
+		if (!bIsFiring)
 		{
-			ServerStartFire();
-		}
+			bIsFiring = true;
 
-		// 立即开火一次
-		if (CanFire())
-		{
-			Fire();
-		}
+			// 服务器端同步
+			if (GetLocalRole() < ROLE_Authority)
+			{
+				ServerStartFire();
+			}
 
-		// 设置定时器用于持续开火
-		if (WeaponDataRow.FireRate > 0.0f)
-		{
-			GetWorldTimerManager().SetTimer(
-				FireTimerHandle,
-				this,
-				&ASDTAWeapon::OnFireTimer,
-				WeaponDataRow.FireRate,
-				true // 循环执行
-			);
+			// 立即开火一次
+			if (CanFire())
+			{
+				Fire();
+			}
+
+			// 设置定时器用于持续开火
+			if (WeaponDataRow.FireRate > 0.0f)
+			{
+				GetWorldTimerManager().SetTimer(
+					FireTimerHandle,
+					this,
+					&ASDTAWeapon::OnFireTimer,
+					WeaponDataRow.FireRate,
+					true // 循环执行
+				);
+			}
 		}
 	}
 }
@@ -112,34 +122,32 @@ void ASDTAWeapon::StartFiring()
 // 停止开火
 void ASDTAWeapon::StopFiring()
 {
-	bIsFiring = false;
-
-	// 清理开火定时器
-	GetWorldTimerManager().ClearTimer(FireTimerHandle);
-
-	// 服务器端同步
-	if (GetLocalRole() < ROLE_Authority)
+	// 如果有武器管理器，调用管理器的停止开火方法
+	if (WeaponManager)
 	{
-		ServerStopFire();
+		WeaponManager->StopFiring();
+	}
+	// 否则使用旧逻辑
+	else
+	{
+		bIsFiring = false;
+
+		// 清理开火定时器
+		GetWorldTimerManager().ClearTimer(FireTimerHandle);
+
+		// 服务器端同步
+		if (GetLocalRole() < ROLE_Authority)
+		{
+			ServerStopFire();
+		}
 	}
 }
 
 // 开火逻辑
 void ASDTAWeapon::Fire()
 {
-	if (!CanFire())
-	{
-		return;
-	}
-
-	// 消耗弹药
-	CurrentAmmo--;
-
-	// 更新HUD
-	if (WeaponOwner)
-	{
-		ISDTAWeaponHolder::Execute_UpdateWeaponHUD(WeaponOwner.GetObject(), CurrentAmmo, WeaponDataRow.MagazineSize);
-	}
+	// 武器管理器已经处理了开火条件检查和弹药消耗
+	// 这里只需要处理视觉效果和子弹生成
 
 	// 根据子弹类型执行不同逻辑
 	switch (WeaponDataRow.BulletType)
@@ -167,7 +175,7 @@ void ASDTAWeapon::Fire()
 	// 播放开火特效
 	PlayFiringEffects();
 
-	// 更新最后开火时间
+	// 更新最后开火时间（用于客户端视觉效果同步）
 	LastFireTime = GetWorld()->GetTimeSeconds();
 }
 
@@ -296,14 +304,10 @@ void ASDTAWeapon::Reload()
 	// 填满弹药
 	CurrentAmmo = WeaponDataRow.MagazineSize;
 
-	// 更新HUD
-	if (WeaponOwner)
-	{
-		ISDTAWeaponHolder::Execute_UpdateWeaponHUD(WeaponOwner.GetObject(), CurrentAmmo, WeaponDataRow.MagazineSize);
-	}
-
 	// 广播换弹完成委托
 	OnReloadCompleted.Broadcast();
+
+	// 注意：UI更新现在由武器管理器处理，这里不再直接更新UI
 }
 
 // 设置武器数据
@@ -364,6 +368,56 @@ void ASDTAWeapon::ServerReload_Implementation()
 bool ASDTAWeapon::ServerReload_Validate()
 {
 	return true;
+}
+
+// 获取当前弹药数量
+int32 ASDTAWeapon::GetCurrentAmmo() const
+{
+	if (WeaponManager)
+	{
+		return WeaponManager->GetCurrentWeaponAmmo();
+	}
+	return CurrentAmmo;
+}
+
+// 获取弹匣容量
+int32 ASDTAWeapon::GetMagazineSize() const
+{
+	if (WeaponManager)
+	{
+		return WeaponManager->GetCurrentWeaponMagazineSize();
+	}
+	return WeaponDataRow.MagazineSize;
+}
+
+// 获取武器伤害
+float ASDTAWeapon::GetWeaponDamage() const
+{
+	if (WeaponManager)
+	{
+		return WeaponManager->GetCurrentWeaponDamage();
+	}
+	return WeaponDataRow.Damage;
+}
+
+// 获取武器射程
+float ASDTAWeapon::GetWeaponRange() const
+{
+	if (WeaponManager)
+	{
+		return WeaponManager->GetCurrentWeaponRange();
+	}
+	return WeaponDataRow.Range;
+}
+
+// 获取武器名称
+FString ASDTAWeapon::GetWeaponName() const
+{
+	if (WeaponManager)
+	{
+		return WeaponManager->GetCurrentWeaponName();
+	}
+	return WeaponDataRow.WeaponName;
 }
 
 // 加载武器数据
@@ -462,6 +516,13 @@ void ASDTAWeapon::PlayFiringMontage()
 // 定时器开火回调
 void ASDTAWeapon::OnFireTimer()
 {
+	// 如果有武器管理器，定时器逻辑由管理器处理
+	if (WeaponManager)
+	{
+		return;
+	}
+	
+	// 否则使用旧逻辑
 	// 检查是否可以继续开火
 	if (!bIsFiring || !CanFire())
 	{
@@ -484,6 +545,12 @@ TSubclassOf<UAnimInstance> ASDTAWeapon::GetFirstPersonAnimInstanceClass() const
 TSubclassOf<UAnimInstance> ASDTAWeapon::GetThirdPersonAnimInstanceClass() const
 {
 	return WeaponDataRow.ThirdPersonAnimInstanceClass;
+}
+
+// 设置武器管理器
+void ASDTAWeapon::SetWeaponManager(USDTAWeaponManager* Manager)
+{
+	WeaponManager = Manager;
 }
 
 // 网络同步
