@@ -17,6 +17,21 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCurrentWeaponChanged, const FName
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWeaponFireStateChanged, bool, bIsFiring);
 
 /**
+ * 武器数据就绪委托（通知角色切换人物动画蓝图）
+ *
+ * 触发时机：武器从数据表加载完属性后
+ * 用途：角色收到后调用 SwitchAnimInstanceClass 切换持枪动画
+ */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+	FOnWeaponDataReady,
+	TSubclassOf<UAnimInstance>, FirstPersonAnimClass,
+	TSubclassOf<UAnimInstance>, ThirdPersonAnimClass
+);
+
+/** 数据表就绪委托（客户端收到复制的数据表后通知角色重新初始化武器） */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnDataTableReady);
+
+/**
  * 武器管理器数据结构
  */
 USTRUCT(BlueprintType)
@@ -31,10 +46,6 @@ struct FWeaponInventoryData
 	// 当前弹药数量
 	UPROPERTY(BlueprintReadWrite, Category = "Weapon Inventory")
 	int32 CurrentAmmo;
-
-	// 后备弹药数量
-	UPROPERTY(BlueprintReadWrite, Category = "Weapon Inventory")
-	int32 ReserveAmmo;
 
 	// 武器数据
 	UPROPERTY(BlueprintReadWrite, Category = "Weapon Inventory")
@@ -99,6 +110,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Weapon Manager")
 	FName GetCurrentWeapon() const;
 
+	/** 获取当前武器Actor */
+	UFUNCTION(BlueprintPure, Category = "Weapon Manager")
+	ASDTAWeapon* GetCurrentWeaponActor() const { return CurrentWeaponActor; }
+
 	/**
 	 * 切换武器
 	 * @param WeaponName 要切换的武器名称
@@ -109,11 +124,10 @@ public:
 	/**
 	 * 添加武器到库存
 	 * @param WeaponName 武器名称
-	 * @param InitialAmmo 初始弹药数量
-	 * @param ReserveAmmo 后备弹药数量
+	 * @param InitialAmmo 初始弹药数量（默认从数据表读取弹匣容量）
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Weapon Manager")
-	void AddWeapon(const FName& WeaponName, int32 InitialAmmo = 0, int32 ReserveAmmo = 0);
+	void AddWeapon(const FName& WeaponName, int32 InitialAmmo = 0);
 
 	/**
 	 * 移除武器从库存
@@ -208,6 +222,74 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Weapon Manager")
 	bool GetCurrentWeaponDataRow(FSDTAWeaponTableRow& OutWeaponDataRow) const;
+	
+	/**
+	 * 装备初始武器（通过名称，仅添加数据到库存）
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Weapon Manager")
+	void EquipInitialWeapon();
+
+	/**
+	 * 装备初始武器并生成Actor（由调用方传入配置）
+	 *
+	 * 功能：根据传入的武器类和名称，从数据表加载全部属性后生成Actor
+	 * 设计要点：数据表为唯一数据源，弹药/伤害/射速等全部由DataTable管理
+	 *
+	 * @param InWeaponClass 要生成的武器蓝图类
+	 * @param InWeaponName 数据表中的行名称（用于查找武器属性）
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Weapon Manager")
+	void EquipInitialWeaponWithActor(
+		TSubclassOf<ASDTAWeapon> InWeaponClass,
+		const FName& InWeaponName
+	);
+	
+	/**
+	 * 设置初始武器
+	 * @param WeaponName 初始武器名称
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Weapon Manager")
+	void SetInitialWeapon(const FName& WeaponName);
+	
+	/**
+	 * 设置初始武器弹药数量
+	 * @param InitialAmmo 初始弹药数量
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Weapon Manager")
+	void SetInitialWeaponAmmo(int32 InitialAmmo);
+
+public:
+	// 委托：武器弹药变化时触发
+	UPROPERTY(BlueprintAssignable, Category = "Weapon Manager Events")
+	FOnWeaponAmmoChanged OnWeaponAmmoChanged;
+
+	// 委托：当前武器变化时触发
+	UPROPERTY(BlueprintAssignable, Category = "Weapon Manager Events")
+	FOnCurrentWeaponChanged OnCurrentWeaponChanged;
+
+	// 委托：武器开火状态变化时触发
+	UPROPERTY(BlueprintAssignable, Category = "Weapon Manager Events")
+	FOnWeaponFireStateChanged OnWeaponFireStateChanged;
+
+	// 委托：武器数据就绪（通知角色切换人物动画蓝图）
+	UPROPERTY(BlueprintAssignable, Category = "Weapon Manager Events")
+	FOnWeaponDataReady OnWeaponDataReady;
+
+	// 委托：数据表就绪（客户端收到复制后通知角色重新初始化）
+	UPROPERTY(BlueprintAssignable, Category = "Weapon Manager Events")
+	FOnDataTableReady OnDataTableReady;
+
+protected:
+	// 初始武器名称（用于数据表查找，保留作为无Actor模式的回退配置）
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Manager")
+	FName InitialWeaponName;
+
+	// 初始弹药数量
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Manager")
+	int32 InitialWeaponAmmo;
+
+	/** 换弹进行中标志（防止重入导致栈溢出） */
+	bool bIsReloading;
 
 protected:
 	/**
@@ -236,6 +318,17 @@ protected:
 	void UpdateWeaponUI();
 
 	/**
+	 * 生成武器Actor实例
+	 * 
+	 * 功能：根据武器类生成武器Actor并附加到角色身上
+	 * 设计要点：参考USDTAWeaponManagerComponent的实现，确保网格正确挂载
+	 * 
+	 * @param WeaponClass 要生成的武器类
+	 * @return 生成的武器Actor指针，失败返回nullptr
+	 */
+	ASDTAWeapon* SpawnWeaponActor(TSubclassOf<ASDTAWeapon> WeaponClass);
+
+	/**
 	 * 获取武器持有者接口
 	 */
 	TScriptInterface<ISDTAWeaponHolder> GetWeaponHolder() const;
@@ -249,7 +342,7 @@ protected:
 	UWorld* World;
 
 	// 武器数据表格
-	UPROPERTY(BlueprintReadOnly, Category = "Weapon Manager")
+	UPROPERTY(ReplicatedUsing = OnRep_WeaponDataTable, BlueprintReadOnly, Category = "Weapon Manager")
 	UDataTable* WeaponDataTable;
 
 	// 当前武器名称
@@ -264,6 +357,9 @@ protected:
 	UPROPERTY(ReplicatedUsing = OnRep_IsFiring, BlueprintReadOnly, Category = "Weapon Manager")
 	bool bIsFiring;
 
+	// 持续开火定时器句柄
+	FTimerHandle FireRateTimerHandle;
+
 	// 上次开火时间
 	UPROPERTY(BlueprintReadOnly, Category = "Weapon Manager")
 	float LastFireTime;
@@ -276,26 +372,17 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon Manager")
 	float RecoilDecayRate;
 
-	// 当前武器Actor
-	UPROPERTY(BlueprintReadOnly, Category = "Weapon Manager")
+	// 当前武器Actor（复制到客户端，用于挂载Mesh）
+	UPROPERTY(ReplicatedUsing = OnRep_CurrentWeaponActor, BlueprintReadOnly, Category = "Weapon Manager")
 	ASDTAWeapon* CurrentWeaponActor;
-
-	// 委托：武器弹药变化时触发
-	UPROPERTY(BlueprintAssignable, Category = "Weapon Manager Events")
-	FOnWeaponAmmoChanged OnWeaponAmmoChanged;
-
-	// 委托：当前武器变化时触发
-	UPROPERTY(BlueprintAssignable, Category = "Weapon Manager Events")
-	FOnCurrentWeaponChanged OnCurrentWeaponChanged;
-
-	// 委托：武器开火状态变化时触发
-	UPROPERTY(BlueprintAssignable, Category = "Weapon Manager Events")
-	FOnWeaponFireStateChanged OnWeaponFireStateChanged;
 
 	/**
 	 * 处理开火逻辑
 	 */
 	void ProcessFire();
+
+	/** 持续开火定时器回调（按 FireRate 周期调用） */
+	void HandleFireRateTimer();
 
 	/**
 	 * 更新冷却时间
@@ -364,11 +451,9 @@ protected:
 	UFUNCTION(Server, Reliable, WithValidation)
 	void ServerSwitchWeapon(const FName& WeaponName);
 
-	/**
-	 * 服务器端添加武器
-	 */
+	/** 服务器端添加武器 */
 	UFUNCTION(Server, Reliable, WithValidation)
-	void ServerAddWeapon(const FName& WeaponName, int32 InitialAmmo, int32 ReserveAmmo);
+	void ServerAddWeapon(const FName& WeaponName, int32 InitialAmmo);
 
 	/**
 	 * 服务器端移除武器
@@ -387,6 +472,14 @@ protected:
 	 */
 	UFUNCTION()
 	void OnRep_IsFiring();
+
+	/** 武器数据表格变更的RepNotify（客户端收到数据表后触发武器初始化） */
+	UFUNCTION()
+	void OnRep_WeaponDataTable();
+
+	/** 当前武器Actor变更的RepNotify（客户端收到后挂载Mesh到本地Pawn） */
+	UFUNCTION()
+	void OnRep_CurrentWeaponActor();
 
 	// 网络同步
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;

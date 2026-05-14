@@ -23,6 +23,7 @@
  */
 
 #include "Variant_SDTA/Core/Game/SDTAGameMode.h"
+#include "Variant_SDTA/Weapons/SDTAWeaponManager.h"
 #include "SevenDaysToAlive.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
@@ -43,12 +44,18 @@
 // 包含昼夜管理器头文件
 #include "Variant_SDTA/Core/Game/DayNight/SDTADayNightManager.h"
 
+/** 定义自定义日志类别：关键游戏事件 */
+DEFINE_LOG_CATEGORY(LogKeyGameEvent);
+
 #pragma region 构造函数和基础方法
 ASDTAGameMode::ASDTAGameMode()
 {
 	// 设置默认GameState类
 	GameStateClass = ASDTAGameState::StaticClass();
-	
+
+	// 默认PlayerController类
+	PlayerControllerClass = ASDTAPlayerController::StaticClass();
+
 	// 设置默认PlayerState类
 	PlayerStateClass = ASDTAPlayerState::StaticClass();
 	
@@ -92,6 +99,13 @@ ASDTAGameMode::ASDTAGameMode()
 	
 	// 日志输出控制
 	LastLogTime = 0.0f;
+}
+
+// 处理玩家加入游戏
+void ASDTAGameMode::PostLogin(APlayerController* NewPlayer)
+{
+	Super::PostLogin(NewPlayer);
+	OnPlayerJoined(NewPlayer);
 }
 
 void ASDTAGameMode::BeginPlay()
@@ -159,6 +173,11 @@ void ASDTAGameMode::BeginPlay()
 		SDTAGameState->NightLightColor = NightLightColor;
 		SDTAGameState->DayAtmosphereColor = DayAtmosphereColor;
 		SDTAGameState->NightAtmosphereColor = NightAtmosphereColor;
+
+		if (WeaponDataTable)
+		{
+			SDTAGameState->WeaponDataTable = WeaponDataTable;
+		}
 	}
 	
 	// 游戏开始逻辑
@@ -502,7 +521,19 @@ bool ASDTAGameMode::CanAffordUpgrade(int32 Cost) const
 #pragma region 多人游戏系统 - 方法声明
 void ASDTAGameMode::OnPlayerJoined(class APlayerController* NewPlayer)
 {
-	// TODO: 实现玩家加入处理
+	if (!NewPlayer) return;
+
+	ASDTAPlayerState* SDTAPlayerState = NewPlayer->GetPlayerState<ASDTAPlayerState>();
+	if (SDTAPlayerState && SDTAPlayerState->WeaponManager && WeaponDataTable)
+	{
+		SDTAPlayerState->WeaponManager->SetWeaponDataTable(WeaponDataTable);
+		UE_LOG(LogTemp, Log, TEXT("玩家加入: 武器数据表已分发至WeaponManager"));
+	}
+	else if (!WeaponDataTable)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("玩家加入: GameMode.WeaponDataTable未设置！请在GameMode蓝图中配置武器数据表"));
+	}
 }
 
 void ASDTAGameMode::OnPlayerLeft(class APlayerController* LeavingPlayer)
@@ -675,8 +706,8 @@ void ASDTAGameMode::StartGame()
 	// 分配初始灵魂碎片
 	DistributeSoulFragments();
 	
-	// 开始第一天白天阶段
-	UE_LOG(LogTemp, Log, TEXT("游戏开始！第 1 天开始。"));
+	// 开始第一天白天阶段（使用自定义日志类别，可在编辑器设置颜色）
+	UE_LOG(LogKeyGameEvent, Log, TEXT("[GameMode]游戏开始！第 1 天开始。"));
 	
 	// 广播游戏状态更新
 	BroadcastGameState();

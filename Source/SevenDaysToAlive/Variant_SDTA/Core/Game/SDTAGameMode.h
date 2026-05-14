@@ -4,10 +4,15 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameMode.h"
+#include "Engine/DataTable.h"
 #include "Variant_SDTA/Core/Game/SDTAGameState.h"
 #include "Variant_SDTA/Core/Game/SDTAPlayerState.h"
 #include "Variant_SDTA/Enemies/AI/EnemyBase.h"
 #include "Variant_SDTA/Core/Game/DayNight/SDTADayNightManager.h"
+
+/** 自定义日志类别：关键游戏事件（可在编辑器 Output Log 中设置独立颜色） */
+DECLARE_LOG_CATEGORY_EXTERN(LogKeyGameEvent, Log, All);
+
 #include "SDTAGameMode.generated.h"
 
 /**
@@ -33,9 +38,11 @@ public:
 	ASDTAGameMode();
 
 protected:
-	virtual void BeginPlay() override;
-	virtual void Tick(float DeltaTime) override;
+	virtual void BeginPlay() override;	// 游戏开始时
+	virtual void Tick(float DeltaTime) override;	// 游戏循环
+	// 游戏状态更新
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void PostLogin(APlayerController* NewPlayer) override;
 
 public:
 	// 获取GameState
@@ -220,6 +227,20 @@ public:
 	// UI更新方法
 	void UpdateGameUI();
 	void BroadcastGameState();
+#pragma endregion
+
+#pragma region 武器系统配置
+public:
+	/**
+	 * 武器数据表格（唯一数据源）
+	 *
+	 * 功能：存储所有武器的属性数据（伤害、射速、弹匣容量等）
+	 * 配置位置：GameMode蓝图 → Details面板 → Weapon System
+	 *
+	 * 数据流：GameMode → PlayerState.WeaponManager → 角色装备武器时查询
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Weapon System")
+	UDataTable* WeaponDataTable;
 #pragma endregion
 
 

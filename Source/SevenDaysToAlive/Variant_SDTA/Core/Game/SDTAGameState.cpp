@@ -67,4 +67,5 @@ void ASDTAGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(ASDTAGameState, bGameStarted);
 	DOREPLIFETIME(ASDTAGameState, bGameOver);
 	DOREPLIFETIME(ASDTAGameState, bVictory);
+	DOREPLIFETIME(ASDTAGameState, WeaponDataTable);
 }

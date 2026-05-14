@@ -12,6 +12,9 @@ ASDTAWeapon::ASDTAWeapon()
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = false;
 
+	bReplicates = true;
+	SetNetUpdateFrequency(30.0f);
+
 	// 创建第一人称武器网格
 	FirstPersonMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("FirstPersonMesh"));
 	FirstPersonMesh->SetOnlyOwnerSee(true);
@@ -321,11 +324,11 @@ void ASDTAWeapon::SetWeaponData(const FDataTableRowHandle& NewWeaponData)
 void ASDTAWeapon::SetWeaponDataRow(const FSDTAWeaponTableRow& NewWeaponDataRow)
 {
 	WeaponDataRow = NewWeaponDataRow;
-	
-	// 更新弹药数量
 	CurrentAmmo = WeaponDataRow.MagazineSize;
-	
-	UE_LOG(LogTemp, Log, TEXT("武器数据行已设置: %s"), *WeaponDataRow.WeaponName);
+
+	LoadWeaponData();
+
+	UE_LOG(LogTemp, Log, TEXT("武器数据行已设置并应用: %s"), *WeaponDataRow.WeaponName);
 }
 
 // 设置武器持有者
@@ -429,16 +432,20 @@ void ASDTAWeapon::LoadWeaponData()
 		{
 			WeaponDataRow = *Row;
 			CurrentAmmo = WeaponDataRow.MagazineSize;
-			
-			// 设置武器网格
+
 			if (FirstPersonMesh && WeaponDataRow.FirstPersonMesh.IsValid())
 			{
 				FirstPersonMesh->SetSkeletalMesh(WeaponDataRow.FirstPersonMesh.LoadSynchronous());
+				UE_LOG(LogTemp, Log, TEXT("武器FP Mesh已设置: %s"), *WeaponDataRow.FirstPersonMesh.ToString());
 			}
+
 			if (ThirdPersonMesh && WeaponDataRow.ThirdPersonMesh.IsValid())
 			{
 				ThirdPersonMesh->SetSkeletalMesh(WeaponDataRow.ThirdPersonMesh.LoadSynchronous());
+				UE_LOG(LogTemp, Log, TEXT("武器TP Mesh已设置: %s"), *WeaponDataRow.ThirdPersonMesh.ToString());
 			}
+
+			UE_LOG(LogTemp, Log, TEXT("武器数据已加载: 武器Mesh已应用"));
 		}
 	}
 }
@@ -557,9 +564,4 @@ void ASDTAWeapon::SetWeaponManager(USDTAWeaponManager* Manager)
 void ASDTAWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-
-	// 同步关键属性
-	DOREPLIFETIME(ASDTAWeapon, CurrentAmmo);
-	DOREPLIFETIME(ASDTAWeapon, bIsFiring);
-	DOREPLIFETIME(ASDTAWeapon, WeaponDataRow);
 }

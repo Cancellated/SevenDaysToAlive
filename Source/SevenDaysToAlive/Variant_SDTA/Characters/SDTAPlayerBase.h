@@ -105,13 +105,22 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	class UDashComponent* DashComponent;
 
-	///** 武器管理组件 */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	class USDTAWeaponManagerComponent* WeaponManagerComponent;
+	/** 初始武器类（在角色蓝图子类中配置，不同角色可设不同武器） */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
+	TSubclassOf<ASDTAWeapon> InitialWeaponClass;
+
+	/** 初始武器名称（对应数据表中的行名，用于查找武器属性） */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon")
+	FName InitialWeaponName;
+
+
 	
 	/** 当前生成的武器UI实例 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UI")
 	USDTAWeaponUI* WeaponUIInstance;
+
+	/** 武器是否已初始化（防止重复初始化） */
+	bool bWeaponInitialized;
 
 	// 健康值变化委托
 	UPROPERTY(BlueprintAssignable, Category = "Events")
@@ -184,9 +193,7 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Events")
 	FOnWeaponAnimInstanceChanged OnWeaponAnimInstanceChanged;
 
-	// 获取武器管理组件
-	UFUNCTION(BlueprintPure, Category = "Weapon")
-	USDTAWeaponManagerComponent* GetWeaponManagerComponent() const { return WeaponManagerComponent; }
+
 
 protected:
 	// 切换动画实例类（网络同步）
@@ -201,9 +208,39 @@ protected:
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastAddRecoil(float RecoilAmount);
 
+	/** 服务器端开火（代理WeaponManager的RPC到Actor上） */
+	UFUNCTION(Server, Reliable, WithValidation)
+	void ServerStartFire();
+
+	/** 服务器端停止开火（代理WeaponManager的RPC到Actor上） */
+	UFUNCTION(Server, Reliable, WithValidation)
+	void ServerStopFire();
+
+	/** 服务器端换弹（代理WeaponManager的RPC到Actor上） */
+	UFUNCTION(Server, Reliable, WithValidation)
+	void ServerReload();
+
+	/** 客户端更新武器弹药UI（仅发送给owning client） */
+	UFUNCTION(Client, Reliable)
+	void ClientUpdateWeaponHUD(int32 CurrentAmmo, int32 MaxAmmo);
+
 private:
-	///** 内部动画实例类切换方法 */
+	/** 内部动画实例类切换方法 */
 	void SwitchAnimInstanceClass(TSubclassOf<UAnimInstance> FirstPersonClass, TSubclassOf<UAnimInstance> ThirdPersonClass);
+
+	/** 武器数据就绪回调（接收WeaponManager广播后切换人物动画蓝图） */
+	UFUNCTION()
+	void OnWeaponDataReady(TSubclassOf<UAnimInstance> FirstPersonAnimClass, TSubclassOf<UAnimInstance> ThirdPersonAnimClass);
+
+	/** 延迟重试武器初始化（等待PlayerState和数据表复制完成） */
+	void TryInitializeWeapon();
+
+	/** 数据表复制到客户端后的回调 */
+	UFUNCTION()
+	void OnDataTableReady();
+
+	/** 客户端等待武器Actor到达并挂载Mesh */
+	void WaitForWeaponActor();
 	
 protected:
 	/** 生成武器UI */

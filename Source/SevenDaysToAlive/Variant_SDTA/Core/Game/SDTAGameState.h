@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameState.h"
+#include "Engine/DataTable.h"
 #include "SDTAGameState.generated.h"
 
 /**
@@ -104,4 +105,8 @@ public:
 
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Game State")
 	bool bVictory;
+
+	// 武器数据表格（全局配置，复制到所有客户端）
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Weapon")
+	UDataTable* WeaponDataTable;
 };

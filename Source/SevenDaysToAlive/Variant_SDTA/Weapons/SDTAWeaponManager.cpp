@@ -6,19 +6,25 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 
+DEFINE_LOG_CATEGORY_STATIC(LogDiagnose, Log, All);
+
 #define LOCTEXT_NAMESPACE "SDTAWeaponManager"
 
 // 构造函数
 USDTAWeaponManager::USDTAWeaponManager()
-	: PlayerState(nullptr)
+	: InitialWeaponName(TEXT("Rifle"))
+	, InitialWeaponAmmo(30)
+	, PlayerState(nullptr)
 	, World(nullptr)
 	, WeaponDataTable(nullptr)
 	, CurrentWeaponName(NAME_None)
+	, WeaponInventory()
 	, bIsFiring(false)
 	, LastFireTime(0.0f)
 	, Recoil(0.0f)
 	, RecoilDecayRate(5.0f)
 	, CurrentWeaponActor(nullptr)
+	, bIsReloading(false)
 {
 	// 设置默认值
 }
@@ -35,23 +41,13 @@ void USDTAWeaponManager::Initialize(ASDTAPlayerState* InPlayerState)
 	// 设置初始状态
 	ResetState();
 
-	UE_LOG(LogTemp, Log, TEXT("武器管理器初始化完成"));
+	UE_LOG(LogTemp, Log, TEXT("[WeaponManager]武器管理器初始化完成"));
 }
 
-// 更新武器管理器状态
+/** 每帧更新（仅用于后坐力衰减等非开火逻辑） */
 void USDTAWeaponManager::Tick(float DeltaTime)
 {
-	// 更新冷却时间
-	UpdateCooldown(DeltaTime);
-
-	// 更新后坐力衰减
 	UpdateRecoilDecay(DeltaTime);
-
-	// 处理持续开火
-	if (bIsFiring && CanFire() && IsFullAuto())
-	{
-		ProcessFire();
-	}
 }
 
 // 获取当前武器
@@ -90,7 +86,7 @@ void USDTAWeaponManager::SwitchWeapon(const FName& WeaponName)
 }
 
 // 添加武器到库存
-void USDTAWeaponManager::AddWeapon(const FName& WeaponName, int32 InitialAmmo, int32 ReserveAmmo)
+void USDTAWeaponManager::AddWeapon(const FName& WeaponName, int32 InitialAmmo)
 {
 	if (HasAuthority())
 	{
@@ -113,7 +109,7 @@ void USDTAWeaponManager::AddWeapon(const FName& WeaponName, int32 InitialAmmo, i
 			{
 				// 加载武器数据
 				WeaponData.WeaponData = *WeaponTableRow;
-				UE_LOG(LogTemp, Log, TEXT("成功加载武器数据: %s"), *WeaponTableRow->WeaponName);
+				UE_LOG(LogTemp, Log, TEXT("[WeaponManager]成功加载武器数据: %s"), *WeaponTableRow->WeaponName);
 				
 				// 如果初始弹药未指定，使用弹匣容量
 				if (InitialAmmo <= 0)
@@ -130,20 +126,21 @@ void USDTAWeaponManager::AddWeapon(const FName& WeaponName, int32 InitialAmmo, i
 			}
 			else
 			{
-				UE_LOG(LogTemp, Warning, TEXT("无法从数据表格加载武器数据: %s"), *WeaponName.ToString());
-				// 使用默认值
+				UE_LOG(LogTemp, Error,
+					TEXT("[WeaponManager]AddWeapon: 数据表中未找到武器行 '%s'，请检查数据表配置，将使用传入的默认弹药值"),
+					*WeaponName.ToString()
+				);
 				WeaponData.CurrentAmmo = InitialAmmo;
 			}
 		}
 		else
 		{
-			UE_LOG(LogTemp, Warning, TEXT("未设置武器数据表格，无法加载武器数据: %s"), *WeaponName.ToString());
-			// 使用默认值
+			UE_LOG(LogTemp, Error,
+				TEXT("[WeaponManager]AddWeapon: WeaponDataTable未设置！无法加载武器 '%s' 的属性，请先配置武器数据表"),
+				*WeaponName.ToString()
+			);
 			WeaponData.CurrentAmmo = InitialAmmo;
 		}
-		
-		// 设置后备弹药
-		WeaponData.ReserveAmmo = ReserveAmmo;
 
 		WeaponInventory.Add(WeaponData);
 
@@ -156,7 +153,7 @@ void USDTAWeaponManager::AddWeapon(const FName& WeaponName, int32 InitialAmmo, i
 	else
 	{
 		// 客户端请求服务器添加
-		ServerAddWeapon(WeaponName, InitialAmmo, ReserveAmmo);
+		ServerAddWeapon(WeaponName, InitialAmmo);
 	}
 }
 
@@ -228,46 +225,77 @@ TArray<FWeaponInventoryData> USDTAWeaponManager::GetWeaponInventory() const
 	return WeaponInventory;
 }
 
-// 开始开火
-void USDTAWeaponManager::StartFiring()
+/** 持续开火定时器回调 */
+void USDTAWeaponManager::HandleFireRateTimer()
 {
 	if (!bIsFiring)
 	{
-		bIsFiring = true;
+		return;
+	}
 
-		if (HasAuthority())
+	if (CanFire() && IsFullAuto())
+	{
+		ProcessFire();
+	}
+}
+
+// 开始开火
+void USDTAWeaponManager::StartFiring()
+{
+	if (bIsFiring)
+	{
+		return;
+	}
+
+	bIsFiring = true;
+
+	if (HasAuthority())
+	{
+		ProcessFire();
+
+		float FireRate = GetCurrentFireRate();
+		if (FireRate > 0.0f && IsFullAuto() && World)
 		{
-			// 服务器端直接处理
-			ProcessFire();
-			// 触发开火状态变更委托
-			OnWeaponFireStateChanged.Broadcast(bIsFiring);
+			float Interval = 1.0f / FireRate;
+			World->GetTimerManager().SetTimer(
+				FireRateTimerHandle,
+				this,
+				&USDTAWeaponManager::HandleFireRateTimer,
+				Interval,
+				true
+			);
 		}
-		else
-		{
-			// 客户端请求服务器开始开火
-			ServerStartFire();
-		}
+
+		OnWeaponFireStateChanged.Broadcast(bIsFiring);
+	}
+	else
+	{
+		ServerStartFire();
 	}
 }
 
 // 停止开火
 void USDTAWeaponManager::StopFiring()
 {
-	if (bIsFiring)
+	if (!bIsFiring)
 	{
-		bIsFiring = false;
+		return;
+	}
 
-		if (HasAuthority())
+	bIsFiring = false;
+
+	if (HasAuthority())
+	{
+		if (World)
 		{
-			// 服务器端直接处理
-			// 触发开火状态变更委托
-			OnWeaponFireStateChanged.Broadcast(bIsFiring);
+			World->GetTimerManager().ClearTimer(FireRateTimerHandle);
 		}
-		else
-		{
-			// 客户端请求服务器停止开火
-			ServerStopFire();
-		}
+
+		OnWeaponFireStateChanged.Broadcast(bIsFiring);
+	}
+	else
+	{
+		ServerStopFire();
 	}
 }
 
@@ -333,35 +361,41 @@ bool USDTAWeaponManager::IsFiring() const
 // 重新装填弹药
 void USDTAWeaponManager::ReloadCurrentWeapon()
 {
+	if (bIsReloading)
+	{
+		return;
+	}
+
 	if (CurrentWeaponName == NAME_None)
 	{
 		return;
 	}
 
+	bIsReloading = true;
+
 	if (HasAuthority())
 	{
-		// 服务器端直接处理
 		FWeaponInventoryData* WeaponData = FindWeaponData(CurrentWeaponName);
 		if (WeaponData)
 		{
 			int32 MagazineSize = GetCurrentMagazineSize();
 			int32 AmmoNeeded = MagazineSize - WeaponData->CurrentAmmo;
 
-			if (AmmoNeeded > 0 && WeaponData->ReserveAmmo > 0)
+			if (AmmoNeeded > 0)
 			{
-				int32 AmmoToLoad = FMath::Min(AmmoNeeded, WeaponData->ReserveAmmo);
-				WeaponData->CurrentAmmo += AmmoToLoad;
-				WeaponData->ReserveAmmo -= AmmoToLoad;
-				// 更新UI
+				WeaponData->CurrentAmmo += AmmoNeeded;
 				UpdateWeaponUI();
+				UE_LOG(LogTemp, Log, TEXT("[WeaponManager]换弹完成: %s → %d/%d"),
+					*CurrentWeaponName.ToString(), WeaponData->CurrentAmmo, MagazineSize);
 			}
 		}
 	}
 	else
 	{
-		// 客户端请求服务器重新装填
 		ServerReload();
 	}
+
+	bIsReloading = false;
 }
 
 // 检查弹药是否充足
@@ -654,14 +688,46 @@ bool USDTAWeaponManager::ServerSwitchWeapon_Validate(const FName& WeaponName)
 }
 
 // 服务器端添加武器
-void USDTAWeaponManager::ServerAddWeapon_Implementation(const FName& WeaponName, int32 InitialAmmo, int32 ReserveAmmo)
+void USDTAWeaponManager::ServerAddWeapon_Implementation(const FName& WeaponName, int32 InitialAmmo)
 {
-	AddWeapon(WeaponName, InitialAmmo, ReserveAmmo);
+	if (!WeaponDataTable)
+	{
+		UE_LOG(LogTemp, Error, TEXT("[WeaponManager]ServerAddWeapon: WeaponDataTable未设置"));
+		return;
+	}
+
+	FSDTAWeaponTableRow* WeaponTableRow = WeaponDataTable->FindRow<FSDTAWeaponTableRow>(
+		WeaponName,
+		TEXT("[WeaponManager]ServerAddWeapon"),
+		false
+	);
+
+	FWeaponInventoryData WeaponData;
+	WeaponData.WeaponName = WeaponName;
+
+	if (WeaponTableRow)
+	{
+		WeaponData.WeaponData = *WeaponTableRow;
+		WeaponData.CurrentAmmo = (InitialAmmo > 0) ? FMath::Min(InitialAmmo, WeaponTableRow->MagazineSize) : WeaponTableRow->MagazineSize;
+	}
+	else
+	{
+		WeaponData.CurrentAmmo = InitialAmmo;
+	}
+
+	WeaponInventory.Add(WeaponData);
+
+	if (CurrentWeaponName == NAME_None)
+	{
+		CurrentWeaponName = WeaponName;
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("[WeaponManager]ServerAddWeapon成功: %s"), *WeaponName.ToString());
 }
 
-bool USDTAWeaponManager::ServerAddWeapon_Validate(const FName& WeaponName, int32 InitialAmmo, int32 ReserveAmmo)
+bool USDTAWeaponManager::ServerAddWeapon_Validate(const FName& WeaponName, int32 InitialAmmo)
 {
-	return WeaponName != NAME_None && InitialAmmo >= 0 && ReserveAmmo >= 0;
+	return WeaponName != NAME_None && InitialAmmo >= 0;
 }
 
 // 服务器端移除武器
@@ -695,8 +761,48 @@ void USDTAWeaponManager::OnRep_IsFiring()
 {
 	UE_LOG(LogTemp, Log, TEXT("开火状态变更RepNotify: %s"), bIsFiring ? TEXT("是") : TEXT("否"));
 	
-	// 触发开火状态变更委托
 	OnWeaponFireStateChanged.Broadcast(bIsFiring);
+}
+
+/** 数据表复制到客户端后触发（通知角色重新初始化武器） */
+void USDTAWeaponManager::OnRep_WeaponDataTable()
+{
+	UE_LOG(LogTemp, Log, TEXT("[WeaponManager]OnRep_WeaponDataTable: 数据表已同步到客户端: %s"),
+		WeaponDataTable ? *WeaponDataTable->GetName() : TEXT("None"));
+
+	OnDataTableReady.Broadcast();
+}
+
+/** 当前武器Actor复制到客户端后触发（挂载Mesh到本地Pawn） */
+void USDTAWeaponManager::OnRep_CurrentWeaponActor()
+{
+	if (!CurrentWeaponActor)
+	{
+		return;
+	}
+
+	UE_LOG(LogDiagnose, Log, TEXT("[Rep] OnRep_CurrentWeaponActor: %s (PlayerState=%p)"),
+		*CurrentWeaponActor->GetName(),
+		PlayerState);
+
+	TScriptInterface<ISDTAWeaponHolder> WeaponHolder = GetWeaponHolder();
+
+	if (!WeaponHolder.GetObject())
+	{
+		UE_LOG(LogDiagnose, Warning, TEXT("[Rep] WeaponHolder为空! PlayerState=%p Pawn=%p 延迟重试..."),
+			PlayerState,
+			(PlayerState ? PlayerState->GetPawn() : nullptr));
+
+		if (World)
+		{
+			FTimerDelegate Delegate = FTimerDelegate::CreateUObject(this, &USDTAWeaponManager::OnRep_CurrentWeaponActor);
+			World->GetTimerManager().SetTimerForNextTick(Delegate);
+		}
+		return;
+	}
+
+	ISDTAWeaponHolder::Execute_AttachWeaponMeshes(WeaponHolder.GetObject(), CurrentWeaponActor);
+	UE_LOG(LogTemp, Log, TEXT("[WeaponManager]客户端武器Mesh已挂载"));
 }
 
 // 网络同步
@@ -704,17 +810,14 @@ void USDTAWeaponManager::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	// 同步当前武器
+	DOREPLIFETIME(USDTAWeaponManager, WeaponDataTable);
 	DOREPLIFETIME(USDTAWeaponManager, CurrentWeaponName);
-
-	// 同步武器库存
+	DOREPLIFETIME(USDTAWeaponManager, CurrentWeaponActor);
 	DOREPLIFETIME(USDTAWeaponManager, WeaponInventory);
-
-	// 同步开火状态
 	DOREPLIFETIME(USDTAWeaponManager, bIsFiring);
 }
 
-// 实现HasAuthority方法
+// 检查是否有权威权限(服务器端)
 bool USDTAWeaponManager::HasAuthority() const
 {
 	if (PlayerState)
@@ -724,7 +827,7 @@ bool USDTAWeaponManager::HasAuthority() const
 	return false;
 }
 
-// 实现IsLocalPlayer方法
+// 检查是否是本地玩家控制器(客户端)
 bool USDTAWeaponManager::IsLocalPlayer() const
 {
 	if (PlayerState)
@@ -776,6 +879,156 @@ void USDTAWeaponManager::UpdateWeaponUI()
 
 	// 触发委托
 	OnWeaponAmmoChanged.Broadcast(WeaponData->CurrentAmmo, WeaponData->WeaponData.MagazineSize);
+}
+
+// 装备初始武器
+void USDTAWeaponManager::EquipInitialWeapon()
+{
+	if (InitialWeaponName != NAME_None)
+	{
+		if (HasAuthority())
+		{
+			AddWeapon(InitialWeaponName, InitialWeaponAmmo);
+			UE_LOG(LogTemp, Log, TEXT("装备初始武器(数据): %s"), *InitialWeaponName.ToString());
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("客户端尝试装备初始武器，但需要通过服务器RPC"));
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("未设置初始武器名称"));
+	}
+}
+
+/**
+ * 生成武器Actor实例
+ * 
+ * 原理说明：
+ * 1. 使用UWorld::SpawnActor生成武器Actor（这是UE中创建Actor的标准方式）
+ * 2. 通过ISDTAWeaponHolder接口将武器网格挂载到角色骨骼上
+ * 3. 激活武器使其进入可用状态
+ * 
+ * 为什么用SpawnActor而不是NewObject？
+ * - Actor需要在世界中有物理位置和变换，必须通过SpawnActor创建
+ * - NewObject只能创建UObject，不具备Actor的物理存在性
+ */
+ASDTAWeapon* USDTAWeaponManager::SpawnWeaponActor(TSubclassOf<ASDTAWeapon> WeaponClass)
+{
+	if (!WeaponClass || !World)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("SpawnWeaponActor失败: 武器类或World无效"));
+		return nullptr;
+	}
+
+	FVector SpawnLocation = FVector::ZeroVector;
+	FRotator SpawnRotation = FRotator::ZeroRotator;
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	ASDTAWeapon* NewWeapon = World->SpawnActor<ASDTAWeapon>(WeaponClass, SpawnLocation, SpawnRotation, SpawnParams);
+	if (!NewWeapon)
+	{
+		UE_LOG(LogTemp, Error, TEXT("SpawnWeaponActor失败: 无法生成武器Actor"));
+		return nullptr;
+	}
+
+	APawn* OwnerPawn = PlayerState ? PlayerState->GetPawn() : nullptr;
+	if (OwnerPawn)
+	{
+		NewWeapon->SetWeaponOwner(OwnerPawn);
+		NewWeapon->SetOwner(OwnerPawn);
+	}
+
+	TScriptInterface<ISDTAWeaponHolder> WeaponHolder = GetWeaponHolder();
+	if (WeaponHolder)
+	{
+		ISDTAWeaponHolder::Execute_AttachWeaponMeshes(WeaponHolder.GetObject(), NewWeapon);
+	}
+
+	NewWeapon->ActivateWeapon();
+
+	UE_LOG(LogTemp, Log, TEXT("武器Actor生成成功: %s"), *NewWeapon->GetName());
+	return NewWeapon;
+}
+
+/**
+ * 装备初始武器并生成Actor（由调用方传入配置）
+ *
+ * 数据流：Character传入Class+Name → Manager查DataTable获取全部属性 → SpawnActor
+ */
+void USDTAWeaponManager::EquipInitialWeaponWithActor(
+	TSubclassOf<ASDTAWeapon> InWeaponClass,
+	const FName& InWeaponName)
+{
+	if (!InWeaponClass)
+	{
+		UE_LOG(LogTemp, Error, TEXT("[WeaponManager]EquipInitialWeaponWithActor: 武器类为空，无法装备"));
+		return;
+	}
+
+	if (!WeaponDataTable)
+	{
+		UE_LOG(LogTemp, Error, TEXT("[WeaponManager]EquipInitialWeaponWithActor: WeaponDataTable未设置！请在GameMode或PlayerState中配置武器数据表"));
+		return;
+	}
+
+	FName WeaponNameToUse = (InWeaponName != NAME_None) ? InWeaponName : InWeaponClass->GetFName();
+
+	const FSDTAWeaponTableRow* WeaponRow = WeaponDataTable->FindRow<FSDTAWeaponTableRow>(
+		WeaponNameToUse,
+		TEXT("[WeaponManager]EquipInitialWeaponWithActor"),
+		false
+	);
+
+	if (!WeaponRow)
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("[WeaponManager]EquipInitialWeaponWithActor: 数据表中未找到武器行 '%s'，请检查数据表配置"),
+			*WeaponNameToUse.ToString()
+		);
+		return;
+	}
+
+	AddWeapon(WeaponNameToUse, WeaponRow->MagazineSize);
+
+	OnWeaponDataReady.Broadcast(
+		WeaponRow->FirstPersonAnimInstanceClass,
+		WeaponRow->ThirdPersonAnimInstanceClass
+	);
+
+	if (!HasAuthority())
+	{
+		UE_LOG(LogTemp, Log, TEXT("[WeaponManager]EquipInitialWeaponWithActor: 客户端跳过Actor生成"));
+		return;
+	}
+
+	CurrentWeaponActor = SpawnWeaponActor(InWeaponClass);
+	if (CurrentWeaponActor)
+	{
+		CurrentWeaponActor->SetWeaponDataRow(*WeaponRow);
+
+		UpdateWeaponUI();
+		OnCurrentWeaponChanged.Broadcast(CurrentWeaponName);
+		UE_LOG(LogTemp, Log, TEXT("[WeaponManager]初始武器装备完成(数据表驱动): %s"), *WeaponNameToUse.ToString());
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("[WeaponManager]初始武器Actor生成失败"));
+	}
+}
+
+// 设置初始武器
+void USDTAWeaponManager::SetInitialWeapon(const FName& WeaponName)
+{
+	InitialWeaponName = WeaponName;
+}
+
+// 设置初始武器弹药数量
+void USDTAWeaponManager::SetInitialWeaponAmmo(int32 InitialAmmo)
+{
+	InitialWeaponAmmo = InitialAmmo;
 }
 
 #undef LOCTEXT_NAMESPACE

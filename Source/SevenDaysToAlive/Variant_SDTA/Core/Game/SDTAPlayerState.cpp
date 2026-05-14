@@ -17,7 +17,6 @@ void ASDTAPlayerState::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// 初始化武器管理器
 	WeaponManager = NewObject<USDTAWeaponManager>();
 	WeaponManager->Initialize(this);
 

@@ -4,6 +4,8 @@
 #include "Net/UnrealNetwork.h"
 #include "EnhancedInputComponent.h"
 
+
+// 此组件被SDTAWeaponManager取代，当前脚本被弃用，请使用SDTAWeaponManager的方法
 // Sets default values for this component's properties
 USDTAWeaponManagerComponent::USDTAWeaponManagerComponent()
 {
